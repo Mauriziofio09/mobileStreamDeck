@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { ActionService } from '../core/action.service';
+import { ConnectionService } from '../core/connection.service';
 import { DeckStore } from '../core/deck.store';
 import { SurfaceDirective } from '../core/surface.directive';
 
@@ -10,8 +11,8 @@ import { SurfaceDirective } from '../core/surface.directive';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="bar" cdSurface="bar" [cdRadius]="0.5" data-no-swipe>
-      @for (e of store.config().emojis; track $index) {
-        <button type="button" class="emoji" [class.hit]="hit() === $index" (click)="insert(e, $index)">{{ e }}</button>
+      @for (e of store.config().emojis; track e.id) {
+        <button type="button" class="emoji" [class.hit]="hit() === $index" [class.offline]="!conn.online()" (click)="insert(e.id, $index)">{{ e.emoji }}</button>
       }
     </div>
   `,
@@ -36,6 +37,7 @@ import { SurfaceDirective } from '../core/surface.directive';
       transition: transform var(--t-press) var(--ease-out);
     }
     .emoji:active { transform: scale(0.85); }
+    .emoji.offline { opacity: 0.45; }
     .emoji.hit { animation: pop 300ms var(--ease-spring); }
     @keyframes pop { 50% { transform: scale(1.25); } }
   `,
@@ -43,12 +45,13 @@ import { SurfaceDirective } from '../core/surface.directive';
 export class EmojiBarComponent {
   protected readonly store = inject(DeckStore);
   private readonly actions = inject(ActionService);
+  protected readonly conn = inject(ConnectionService);
   protected readonly hit = signal<number | null>(null);
 
-  protected async insert(emoji: string, i: number): Promise<void> {
+  protected async insert(id: string, i: number): Promise<void> {
     this.hit.set(i);
     setTimeout(() => this.hit.set(null), 320);
-    const r = await this.actions.run({ type: 'insertEmoji', emoji });
+    const r = await this.actions.run(id);
     if (!r.ok) this.store.toast(r.reason, 'error');
   }
 }

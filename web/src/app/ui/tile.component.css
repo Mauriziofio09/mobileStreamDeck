@@ -184,3 +184,21 @@
 /* Leere Plätze nur im Bearbeitungsmodus zeigen (Rahmen inklusive). */
 :host(.is-empty) .frame { opacity: 0; transition: opacity 200ms; }
 :host(.is-empty.is-editing) .frame { opacity: 1; }
+
+/* Offline: Kacheln gedimmt, Symbol oben links; Tippen löst nichts aus (keine Warteschlange). */
+:host(.is-offline) .tile > :not(.flash) { opacity: 0.42; }
+:host(.is-offline) .tile { filter: none; }
+.offline-badge {
+  position: absolute;
+  top: calc(var(--frame) * 0.03);
+  left: calc(var(--frame) * 0.03);
+  width: calc(var(--frame) * 0.22);
+  height: calc(var(--frame) * 0.22);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--frame) * 0.13);
+  color: var(--c-warn);
+  background: var(--c-delete);
+  box-shadow: 0 0 0 1px var(--c-pill-rim);
+}

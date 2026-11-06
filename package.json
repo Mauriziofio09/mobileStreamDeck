@@ -1,14 +1,19 @@
 {
   "name": "copper-deck",
   "private": true,
-  "version": "0.1.0",
-  "workspaces": ["shared", "web", "helper"],
+  "version": "0.2.0",
+  "workspaces": [
+    "shared",
+    "web",
+    "helper"
+  ],
   "scripts": {
-    "icons": "node tools/extract-icons.mjs",
-    "build": "npm run build -w web",
-    "preview:devices": "node tools/serve-preview.mjs",
+    "build": "npm run build -w web && npm run build -w helper",
+    "test": "npm run typecheck -w helper && npm test -w helper",
+    "helper": "helper/bin/copper-deck serve",
     "screenshots": "node tools/screenshots.mjs",
-    "compare": "node tools/compare.mjs"
+    "compare": "node tools/compare.mjs",
+    "e2e": "node tools/e2e-m2.mjs && node tools/e2e-m2-offline.mjs /tmp/copper-deck-e2e-helper.log"
   },
   "devDependencies": {
     "playwright": "1.65.0",

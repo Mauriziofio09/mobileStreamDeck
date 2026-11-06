@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { ActionService } from '../core/action.service';
 import { AppCatalogService } from '../core/app-catalog.service';
+import { ConnectionService } from '../core/connection.service';
 import { DeckStore } from '../core/deck.store';
 import { SurfaceDirective } from '../core/surface.directive';
 
@@ -23,7 +24,8 @@ import { SurfaceDirective } from '../core/surface.directive';
             [cdRadius]="0.27"
             [style.z-index]="i + 1"
             [attr.aria-label]="item.label"
-            (click)="open(item.bundleId)"
+            (click)="open(item.id)"
+            [class.offline]="!conn.online()"
           >
             @if (catalog.lookup(item.bundleId)?.icon; as src) {
               <img [src]="src" alt="" draggable="false" />
@@ -70,6 +72,7 @@ import { SurfaceDirective } from '../core/surface.directive';
     }
     .item:first-child { margin-left: 0; }
     .item:active { transform: scale(0.92); }
+    .item.offline img { opacity: 0.45; }
     img {
       width: calc(var(--dock-item) * 0.86 * var(--icon-overscan));
       height: calc(var(--dock-item) * 0.86 * var(--icon-overscan));
@@ -90,9 +93,10 @@ export class DockComponent {
   protected readonly store = inject(DeckStore);
   protected readonly catalog = inject(AppCatalogService);
   private readonly actions = inject(ActionService);
+  protected readonly conn = inject(ConnectionService);
 
-  protected async open(bundleId: string): Promise<void> {
-    const r = await this.actions.run({ type: 'openApp', bundleId });
+  protected async open(id: string): Promise<void> {
+    const r = await this.actions.run(id);
     if (!r.ok) this.store.toast(r.reason, 'error');
   }
 }

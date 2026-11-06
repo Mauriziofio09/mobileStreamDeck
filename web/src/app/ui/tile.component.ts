@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, injec
 import { Tile } from '@copper-deck/shared';
 import { ActionService } from '../core/action.service';
 import { AppCatalogService } from '../core/app-catalog.service';
+import { ConnectionService } from '../core/connection.service';
 import { DeckStore } from '../core/deck.store';
 import { GESTURE, GestureBus } from '../core/gestures';
 import { SurfaceDirective, SurfaceVariant } from '../core/surface.directive';
@@ -18,12 +19,15 @@ type Status = 'idle' | 'busy' | 'ok' | 'error';
     '[class.is-pressed]': 'pressed()',
     '[class.is-editing]': 'store.editMode()',
     '[class.is-empty]': '!tile()',
+    '[class.is-offline]': '!!tile() && !conn.online()',
     '[style.--wiggle-delay]': 'wiggleDelay',
     '[style.--label-scale]': 'labelScale()',
     '(pointerdown)': 'onDown($event)',
     '(pointermove)': 'onMove($event)',
     '(pointerup)': 'onUp($event)',
     '(pointercancel)': 'cancel()',
+    '[attr.aria-label]': 'tile()?.label ?? null',
+    role: 'button',
     '(contextmenu)': '$event.preventDefault()',
   },
   template: `
@@ -58,6 +62,9 @@ type Status = 'idle' | 'busy' | 'ok' | 'error';
             <cd-icon [name]="status() === 'ok' ? 'check' : 'cross'" />
           </span>
         }
+        @if (!conn.online() && status() === 'idle') {
+          <span class="offline-badge" aria-label="Offline"><cd-icon name="offline" /></span>
+        }
         @if (store.editMode()) {
           <span class="delete" aria-label="Entfernen"><cd-icon name="minus" /></span>
         }
@@ -75,6 +82,7 @@ export class TileComponent {
   private readonly catalog = inject(AppCatalogService);
   private readonly actions = inject(ActionService);
   private readonly timers = inject(TimerService);
+  protected readonly conn = inject(ConnectionService);
   private readonly bus = inject(GestureBus);
 
   protected readonly pressed = signal(false);
@@ -130,7 +138,7 @@ export class TileComponent {
     const t = this.tile();
     if (t?.kind !== 'action') return '';
     if (t.icon.type === 'appIcon') return this.catalog.lookup(t.icon.bundleId)?.icon ?? '';
-    if (t.icon.type === 'image') return `media/${encodeURIComponent(t.icon.file)}`;
+    if (t.icon.type === 'image') return ''; // eigene Bilder: Meilenstein 4
     return '';
   });
 
@@ -198,7 +206,7 @@ export class TileComponent {
     this.flash.set(true);
     setTimeout(() => this.flash.set(false), 260);
     this.status.set('busy');
-    const result = await this.actions.run(t.action);
+    const result = await this.actions.run(t.id);
     this.status.set(result.ok ? 'ok' : 'error');
     if (!result.ok) this.store.toast(result.reason, 'error');
     else if (result.message) this.store.toast(result.message, 'info');

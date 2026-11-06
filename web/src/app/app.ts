@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ConnectionService } from './core/connection.service';
 import { DeckStore } from './core/deck.store';
 import { LayoutService, RATIO } from './core/layout.service';
 import { SurfaceDirective } from './core/surface.directive';
@@ -7,13 +8,15 @@ import { EmojiBarComponent } from './ui/emoji-bar.component';
 import { PageDotsComponent } from './ui/page-dots.component';
 import { PagerComponent } from './ui/pager.component';
 import { SheetsComponent } from './ui/sheets.component';
+import { OfflineComponent } from './ui/offline.component';
+import { PairingComponent } from './ui/pairing.component';
 import { SideControlsComponent } from './ui/side-controls.component';
 
 @Component({
   selector: 'app-root',
   imports: [
     PagerComponent, PageDotsComponent, EmojiBarComponent, DockComponent,
-    SideControlsComponent, SheetsComponent, SurfaceDirective,
+    SideControlsComponent, SheetsComponent, SurfaceDirective, PairingComponent, OfflineComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -27,6 +30,14 @@ export class App {
   protected readonly store = inject(DeckStore);
   protected readonly layoutService = inject(LayoutService);
   protected readonly layout = this.layoutService.layout;
+  protected readonly conn = inject(ConnectionService);
+
+  /** Kopplung, Offline-Vollbild (noch nie Konfiguration erhalten) oder das Deck. */
+  protected readonly view = computed<'pairing' | 'offline' | 'deck'>(() => {
+    if (this.conn.state() === 'unpaired') return 'pairing';
+    if (!this.conn.config()) return 'offline';
+    return 'deck';
+  });
 
   protected readonly hostClass = computed(() => {
     const l = this.layout();

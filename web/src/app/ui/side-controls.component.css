@@ -70,3 +70,17 @@
 /* Wie in der Vorlage: Beschriftung und Symbol um 90° gedreht. */
 :host(.vertical) .seg-label { writing-mode: vertical-rl; }
 :host(.vertical) .seg-icon { transform: rotate(90deg); }
+
+/* Sichtbarer Verbindungsstatus am About-Segment */
+.about-icon { position: relative; }
+.conn {
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--c-warn);
+  box-shadow: 0 0 0 2px var(--c-pill-fill-top);
+}
+.conn[data-state='online'] { background: var(--c-ok); }

@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": false,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "types": ["node"],
+    "noEmit": true,
+    "paths": {
+      "@copper-deck/shared": ["../shared/src/index.ts"],
+      "@copper-deck/shared/schema": ["../shared/src/schema.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "../shared/src/**/*.ts"]
+}

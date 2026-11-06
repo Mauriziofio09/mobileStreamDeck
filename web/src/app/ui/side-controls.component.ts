@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ConnectionService } from '../core/connection.service';
 import { DeckStore } from '../core/deck.store';
 import { LayoutService } from '../core/layout.service';
 import { SurfaceDirective } from '../core/surface.directive';
@@ -36,7 +37,7 @@ import { IconComponent } from './icons';
         (click)="store.sheet.set('about')"
       >
         @if (store.sheet() === 'about') { <span class="seg-bg" cdSurface="segment" [cdRadius]="0.5"></span> }
-        <span class="seg-icon about-icon"><cd-icon name="info" /></span>
+        <span class="seg-icon about-icon"><cd-icon name="info" /><span class="conn" [attr.data-state]="conn.state()"></span></span>
         <span class="seg-label">About</span>
       </button>
       <button type="button" class="seg" [class.active]="store.barActive()" (click)="store.toggleBar()">
@@ -51,6 +52,7 @@ import { IconComponent } from './icons';
 export class SideControlsComponent {
   protected readonly store = inject(DeckStore);
   protected readonly timers = inject(TimerService);
+  protected readonly conn = inject(ConnectionService);
   private readonly layout = inject(LayoutService);
   protected readonly vertical = computed(() => this.layout.layout().controls === 'side');
 }

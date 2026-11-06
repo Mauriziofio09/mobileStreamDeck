@@ -1,8 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { DeckConfig, TileGroup } from '@copper-deck/shared';
-import { AppCatalogService } from './app-catalog.service';
+import type { DeckConfig, TileGroup } from '@copper-deck/shared';
+import { ConnectionService } from './connection.service';
 import { LayoutService } from './layout.service';
-import { SAMPLE_CONFIG } from './sample-config';
 
 export type Sheet = 'none' | 'about' | 'timer';
 
@@ -16,9 +15,10 @@ export interface Toast {
 @Injectable({ providedIn: 'root' })
 export class DeckStore {
   private readonly layoutService = inject(LayoutService);
-  private readonly catalog = inject(AppCatalogService);
+  private readonly conn = inject(ConnectionService);
 
-  readonly config = signal<DeckConfig>(SAMPLE_CONFIG);
+  /** Aktuelle Konfiguration vom Helper (bzw. zuletzt bekannte, wenn offline). */
+  readonly config = computed<DeckConfig>(() => this.conn.config() ?? EMPTY_CONFIG);
   readonly page = signal(0);
   readonly editMode = signal(false);
   readonly sheet = signal<Sheet>('none');
@@ -28,10 +28,7 @@ export class DeckStore {
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private toastId = 0;
 
-  readonly dock = computed(() => {
-    const configured = this.config().dock;
-    return configured.length > 0 ? configured : this.catalog.dock();
-  });
+  readonly dock = computed(() => this.config().dock);
 
   /** Seiten nach Gerät: iPad 2 Gruppen, iPhone 1 Gruppe pro Seite. */
   readonly pages = computed<TileGroup[][]>(() => {
@@ -63,3 +60,5 @@ export class DeckStore {
     this.page.set(Math.max(0, Math.min(max, index)));
   }
 }
+
+const EMPTY_CONFIG: DeckConfig = { schemaVersion: 1, revision: 0, groups: [], emojis: [], dock: [] };

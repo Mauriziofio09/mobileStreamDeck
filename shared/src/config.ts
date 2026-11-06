@@ -13,13 +13,14 @@ export type TileColor = 'brown' | 'violet';
 
 export type Modifier = 'command' | 'option' | 'control' | 'shift';
 
+
 export type TimerPreset = 'pomodoro' | 'break';
 
 /** Streng typisierte Aktionen aus einer festen Liste. */
 export type Action =
   | { readonly type: 'openApp'; readonly bundleId: string }
   | { readonly type: 'openUrl'; readonly url: string }
-  | { readonly type: 'hotkey'; readonly modifiers: readonly Modifier[]; readonly key: string }
+  | { readonly type: 'hotkey'; readonly modifiers: readonly Modifier[]; readonly key: HotkeyKey }
   | { readonly type: 'tileWindows' }
   | { readonly type: 'stageManager' }
   | { readonly type: 'timer'; readonly preset: TimerPreset }
@@ -63,6 +64,11 @@ export interface TileGroup {
   readonly tiles: readonly (Tile | null)[];
 }
 
+export interface EmojiItem {
+  readonly id: string;
+  readonly emoji: string;
+}
+
 export interface DockItem {
   readonly id: string;
   readonly bundleId: string;
@@ -75,7 +81,7 @@ export interface DeckConfig {
   readonly revision: number;
   /** Geordnete Liste; Seiten ergeben sich aus dem Gerät (iPad 2, iPhone 1 Gruppe pro Seite). */
   readonly groups: readonly TileGroup[];
-  readonly emojis: readonly string[];
+  readonly emojis: readonly EmojiItem[];
   readonly dock: readonly DockItem[];
 }
 
@@ -83,6 +89,15 @@ export interface DeckConfig {
 export interface InstalledApp {
   readonly bundleId: string;
   readonly name: string;
-  /** Relativer Pfad zum gecachten PNG-Icon, falls vorhanden. */
-  readonly icon: string | null;
 }
+
+/** Erlaubte Tasten für Tastenkombinationen (feste Liste). */
+export const HOTKEY_KEYS = [
+  ...'abcdefghijklmnopqrstuvwxyz0123456789'.split(''),
+  'space', 'return', 'tab', 'escape', 'delete', 'forwarddelete',
+  'up', 'down', 'left', 'right', 'home', 'end', 'pageup', 'pagedown',
+  'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12',
+] as const;
+export type HotkeyKey = (typeof HOTKEY_KEYS)[number];
+
+export const MODIFIERS = ['command', 'option', 'control', 'shift'] as const;

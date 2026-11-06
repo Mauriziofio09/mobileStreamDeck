@@ -1,0 +1,4 @@
+#!/bin/sh
+# Startet die Copper-Deck-CLI (pair, devices, revoke, cert, serve, status).
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
+exec node "$DIR/dist/copper-deck.mjs" "$@"

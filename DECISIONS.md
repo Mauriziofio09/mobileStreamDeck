@@ -70,3 +70,64 @@ Hier steht, was ich selbst entschieden habe. Neue Einträge kommen jeweils unten
 - Der Timer läuft nur lokal im Browser. Ab Meilenstein 3 gibt der Helper die Endzeit vor.
 - Langes Drücken zeigt nur den Bearbeitungsmodus (Wackeln, Minus-Symbol, „Fertig“). Verschieben und Bearbeiten kommen in Meilenstein 4.
 - Für die Geräte gibt es nur HTTP über den Angular-Dev-Server. Service Worker und eine echte PWA brauchen HTTPS und kommen in Meilenstein 2.
+
+## Meilenstein 2 – Helper, HTTPS, Kopplung
+
+### Aufbau
+- Der Helper ist in TypeScript geschrieben und wird mit esbuild zu **einer Datei** gebündelt (`helper/dist/copper-deck.mjs`). Das gibt eine stabile Grundlage für das App-Bundle in M3.
+- Typprüfung mit `tsc`, Tests mit `node:test` über tsx.
+- Express 5 und `ws` laufen auf **einem** HTTPS-Port, standardmässig **7443**. Der Port lässt sich in `settings.json` oder über `COPPER_DECK_PORT` ändern.
+- zod-Schemas liegen in `shared/src/schema.ts`. Der Helper prüft damit Konfiguration, Client-Nachrichten und die Kopplung. Die PWA importiert diese Datei nicht.
+- **CLI ↔ Helper:** Die CLI spricht über einen Unix-Socket im Datenordner (`admin.sock`, Rechte 600) mit dem Helper. So kann `copper-deck pair` den Code anzeigen, ohne dass der Helper ein Terminal hat. Der Code wird nie ins Log geschrieben.
+
+### Sicherheit
+- **Origin-Whitelist:** genau `https://<localhostname>.local:7443` und `https://localhost:7443`. Den Origin vergleiche ich in Kleinbuchstaben, weil Browser den Host kleingeschrieben senden. Die IP-Adresse ist bewusst **kein** erlaubter Origin, denn die App soll die `.local`-Adresse verwenden.
+- **WebSocket:**
+  - Origin wird beim Upgrade geprüft; ein fehlender oder falscher Origin wird mit 403 abgelehnt.
+  - Query-Parameter in der WebSocket-URL werden mit 400 abgelehnt.
+  - Das Token kommt als **erste Nachricht** (`auth`) und muss innerhalb von 5 s eintreffen.
+  - Ein ungültiges Token wird mit Close-Code 4401 beantwortet, ein Widerruf mit 4403.
+- **HTTP:**
+  - Alle `/api`-Endpunkte ausser `POST /api/pair` verlangen `Authorization: Bearer`.
+  - Ein vorhandener, aber falscher `Origin` ergibt 403.
+  - Öffentlich ist nur die App-Shell (statische Dateien).
+- **Icons:** Sie sind ebenfalls geschützt. Die PWA lädt sie per `fetch` mit Header und zeigt sie als Blob-URL, damit `<img src>` nie ein Token braucht. Zusätzlich liegen sie in Cache Storage, damit sie auch offline angezeigt werden.
+- **Tokens:** 256 Bit Zufall (base64url). Gespeichert wird nur der SHA-256-Hash in `devices.json` (Rechte 600), Vergleich mit `timingSafeEqual`. Ein langsamer Hash ist bei Zufallstokens dieser Länge nicht nötig.
+- **Kopplungscode:** wird mit `crypto.randomInt` erzeugt. Ein neuer `pair`-Aufruf ersetzt den alten Code. Nach einem Fehlversuch wartet der Server 400 ms.
+- **Kopplung nur in der installierten PWA:** Auf iOS zeigt Safari ohne Standalone-Modus nur die Installationsanleitung. Auf dem Mac-Browser ist die Kopplung erlaubt (für Entwicklung und Tests).
+- **Content Security Policy:** `script-src 'self'`, keine Inline-Skripte. Deshalb ist `inlineCritical` im Angular-Build abgeschaltet. `style-src` braucht `'unsafe-inline'`, weil Angular Styles inline setzt.
+- **Datenordner:** Rechte 700. Schlüssel, Konfiguration, Geräte und Log haben die Rechte 600.
+
+### Aktionen
+- Der Client sendet nur `run {requestId, actionId}`. Die `actionId` ist eine Kachel-, Dock- oder Emoji-ID. Der Helper sucht die zugehörige Aktion in **seiner** Konfiguration und prüft sie vor der Ausführung erneut gegen das Schema.
+- Damit auch Emojis eine Aktions-ID haben, sind sie jetzt `{id, emoji}`-Objekte (Konfigurationsänderung gegenüber M1).
+- **App öffnen:** `execFile('/usr/bin/open', ['-b', bundleId])`. Fehlt die App, gibt es die verständliche Fehlermeldung „nicht installiert“.
+- **Link öffnen:** `execFile('/usr/bin/open', [url])`, nur http/https, keine Zugangsdaten in der URL.
+- **Alle Programme mit absolutem Pfad:** wichtig für launchd, das einen minimalen PATH hat.
+- Aktionen aus M3 antworten vorerst mit `not_implemented`.
+- **Timeout:** Server 15 s, Client 10 s. Bricht die Verbindung während einer Aktion ab, meldet der Client „Ergebnis unbekannt“ und wiederholt die Aktion **nicht**.
+- **App-Verfügbarkeit:** Der Helper schickt die Liste der installierten Apps, die in der Konfiguration vorkommen. Kacheln für fehlende Apps zeigen „Nicht installiert“.
+- **Startbelegung:** wird beim ersten Start im Helper angelegt. Das Dock enthält zuerst die Apps aus deinem macOS-Dock, dann zuletzt verwendete, dann Ergänzungen. Die Testgruppen aus M1 (Werkzeuge, Photoshop) sind entfernt.
+
+### Verbindung
+- **Reconnect-Backoff:** 0,5 / 1 / 2 / 4 / 8 / 15 s, jeweils plus bis zu 30 % Zufall.
+  - Bei `visibilitychange`, `pageshow`, `focus` und `online`: sofort neu verbinden. Ist die Verbindung angeblich offen, schickt der Client ein Ping; kommt nach 4 s kein Pong, verbindet er neu.
+  - Im Hintergrund plant der Client keine weiteren Versuche (iOS würde sie ohnehin anhalten).
+- **Heartbeat:** Der Server pingt alle 20 s und beendet tote Sockets. Der Client sendet alle 15 s ein Ping auf Anwendungsebene.
+- **Offline:**
+  - Kacheln, Emoji-Leiste und Dock werden gedimmt, Kacheln zeigen ein Offline-Symbol.
+  - Oben erscheint ein Banner; Tippen auf das Banner startet sofort einen neuen Versuch.
+  - Tippen auf eine Kachel meldet sofort „Keine Verbindung“. Es wird **nichts** gespeichert oder nachgeholt (per E2E-Test geprüft).
+- **Offline-Vollbild:** erscheint, wenn noch nie eine Konfiguration empfangen wurde. Sonst zeigt die App die zuletzt bekannte Konfiguration aus `localStorage` (sie enthält keine Geheimnisse) im Offline-Zustand.
+- **Service Worker:** Angular-`ngsw`, die App-Shell wird vorab geladen. Navigation zu `/api` und `/ws` geht nie über den Cache. Beim allerersten Laden braucht der Service Worker einige Sekunden, bis die Shell im Cache liegt.
+- **Sichtbarer Status:** Ein Punkt am About-Segment (grün, orange oder rot), das Banner und Details im About-Sheet.
+
+### Zertifikat
+- mkcert mit absolutem Pfad (`/opt/homebrew/bin/mkcert`).
+- Namen im Zertifikat: `<localhostname>.local`, alle IPv4-Adressen der `en*`-Schnittstellen (keine VPN-Tunnel wie `utun`), `localhost`, `127.0.0.1`.
+- Automatische Neuausstellung bei Ablauf in unter 30 Tagen, fehlendem Namen oder neuer IP.
+- `copper-deck cert --renew` lädt das Zertifikat im laufenden Helper per `setSecureContext` neu, ohne Neustart.
+
+### Behobener Fehler aus dem E2E-Test
+- Ein sofortiger Neustart nach SIGTERM scheiterte: Der alte Prozess beantwortete den Admin-Socket noch bis zu 3 s.
+- Jetzt schliesst der Helper beim Beenden zuerst den Socket und trennt offene HTTP-Verbindungen aktiv. Beim Start wartet er bis zu 6 s auf einen auslaufenden Vorgänger. Das ist auch für die launchd-Neustarts in M3 wichtig.

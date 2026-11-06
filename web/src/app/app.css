@@ -130,3 +130,23 @@
 @keyframes drop { from { opacity: 0; transform: translateY(-24px); } }
 @keyframes lift { from { opacity: 0; transform: translate(var(--tx, 0), 24px); } }
 .toast { --tx: -50%; }
+
+.conn-banner {
+  position: absolute;
+  top: calc(var(--sa-t) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: var(--c-toast);
+  box-shadow: 0 0 0 1px var(--c-warn), 0 4px 14px var(--c-tile-shadow);
+  color: var(--c-text-cream);
+  font: 500 14px var(--font-ui);
+  white-space: nowrap;
+}
+.conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c-warn); animation: pulse 1.2s ease-in-out infinite alternate; }
+@keyframes pulse { from { opacity: 0.35; } }

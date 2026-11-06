@@ -1,5 +1,7 @@
 <div class="backdrop" aria-hidden="true"></div>
 
+@if (view() === 'deck') {
+
 @if (layout().barMode === 'inline' && layoutService.barVisible()) {
   <cd-emoji-bar class="top-bar" />
 }
@@ -37,4 +39,17 @@
   }
 }
 
+}
+
 <cd-sheets />
+
+@switch (view()) {
+  @case ('pairing') { <cd-pairing /> }
+  @case ('offline') { <cd-offline /> }
+}
+
+@if (view() === 'deck' && !conn.online()) {
+  <div class="conn-banner" data-no-swipe role="status" (click)="conn.connect()">
+    <span class="conn-dot"></span>{{ conn.state() === 'connecting' ? 'Verbinde mit dem Mac …' : 'Offline – Aktionen sind deaktiviert' }}
+  </div>
+}
