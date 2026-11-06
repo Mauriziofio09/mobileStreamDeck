@@ -1,0 +1,67 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: var(--c-scrim);
+  animation: fade 180ms ease-out both;
+  padding: calc(var(--sa-t) + 16px) calc(var(--sa-r) + 16px) calc(var(--sa-b) + 16px) calc(var(--sa-l) + 16px);
+}
+.sheet {
+  width: min(440px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 26px 26px 18px;
+  color: var(--c-text-cream);
+  animation: rise 260ms var(--ease-spring) both;
+}
+h2 {
+  margin: 0;
+  font-family: var(--font-label);
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+.sub, .hint, .running { margin: 4px 0 16px; color: var(--c-text-muted); font-size: 15px; }
+.running strong { color: var(--c-text-cream); font-variant-numeric: tabular-nums; }
+.hint { margin: 16px 0 4px; font-size: 13px; }
+dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 15px; }
+dt { color: var(--c-text-muted); }
+dd { margin: 0; }
+.status { display: flex; gap: 6px; align-items: center; }
+.status.demo { color: var(--c-warn); }
+
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.choice {
+  position: relative;
+  border: 0;
+  background: transparent;
+  aspect-ratio: 1;
+  color: var(--c-text-cream);
+  text-align: left;
+  padding: 0;
+  transition: transform var(--t-press) var(--ease-out);
+}
+.choice.violet { color: var(--c-text-lilac); }
+.choice:active { transform: scale(0.95); }
+.choice .emoji { position: absolute; top: 12%; right: 12%; font-size: 40px; line-height: 1; }
+.choice .name {
+  position: absolute; left: 11%; bottom: 26%;
+  font-family: var(--font-label); font-weight: 700; font-size: 22px; text-transform: uppercase; line-height: 1;
+}
+.choice .min { position: absolute; left: 11%; bottom: 11%; font-size: 13px; opacity: 0.85; }
+
+.close {
+  display: block;
+  margin: 18px auto 0;
+  border: 0;
+  background: transparent;
+  color: var(--c-text-muted);
+  font: 500 15px var(--font-ui);
+  padding: 8px 16px;
+}
+
+@keyframes fade { from { opacity: 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(16px) scale(0.97); } }

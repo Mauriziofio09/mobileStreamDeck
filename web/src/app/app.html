@@ -1,0 +1,40 @@
+<div class="backdrop" aria-hidden="true"></div>
+
+@if (layout().barMode === 'inline' && layoutService.barVisible()) {
+  <cd-emoji-bar class="top-bar" />
+}
+
+<cd-pager />
+
+<cd-page-dots class="dots" />
+
+@if (layout().barMode === 'inline' && layoutService.barVisible()) {
+  <cd-dock class="dock" />
+}
+
+@if (layout().device === 'phone' && layout().orientation === 'landscape') {
+  <button type="button" class="grabber" data-no-swipe aria-label="Bar öffnen" (click)="store.toggleBar()"></button>
+}
+
+<cd-side-controls class="controls" />
+
+@if (layout().barMode === 'overlay' && store.overlayOpen()) {
+  <div class="overlay" data-no-swipe (click)="store.overlayOpen.set(false)">
+    <cd-emoji-bar class="overlay-bar" (click)="$event.stopPropagation()" />
+    <cd-dock class="overlay-dock" (click)="$event.stopPropagation()" />
+  </div>
+}
+
+@if (store.editMode()) {
+  <button type="button" class="done" data-no-swipe cdSurface="segment" [cdRadius]="0.5" (click)="store.editMode.set(false)">
+    Fertig
+  </button>
+}
+
+@if (store.currentToast(); as toast) {
+  @for (t of [toast]; track t.id) {
+    <div class="toast" [class.error]="t.kind === 'error'" role="status">{{ t.text }}</div>
+  }
+}
+
+<cd-sheets />

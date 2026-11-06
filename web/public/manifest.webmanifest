@@ -1,0 +1,12 @@
+{
+  "name": "Copper Deck",
+  "short_name": "Copper Deck",
+  "lang": "de",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#170800",
+  "theme_color": "#170800",
+  "icons": []
+}

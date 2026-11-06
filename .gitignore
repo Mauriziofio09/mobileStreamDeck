@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.angular/
+.idea/
+.DS_Store
+# Lokal vom Mac extrahierte App-Icons (nicht ins Repo)
+web/public/app-icons/
+# Designvorlage und Vergleichsbilder nur lokal
+design-ref/
+screenshots/

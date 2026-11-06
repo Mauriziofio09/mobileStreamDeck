@@ -1,0 +1,186 @@
+:host {
+  display: block;
+  width: var(--frame);
+  height: var(--frame);
+  position: relative;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.frame {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.tile {
+  position: relative;
+  width: var(--tile);
+  height: var(--tile);
+  color: var(--c-text-cream);
+  transition: transform var(--t-press) var(--ease-out);
+  will-change: transform;
+}
+.tile.violet { color: var(--c-text-lilac); }
+
+:host(.is-pressed) .tile { transform: scale(0.93); }
+
+/* Echtes App-Icon: macOS-Icons haben ~10 % transparenten Rand, daher hochskalieren. */
+.app-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--tile) * var(--icon-overscan));
+  height: calc(var(--tile) * var(--icon-overscan));
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.glyph {
+  position: absolute;
+  top: calc(var(--tile) * 0.1);
+  right: calc(var(--tile) * 0.1);
+  pointer-events: none;
+}
+.emoji {
+  font-size: calc(var(--tile) * 0.3);
+  line-height: 1;
+  font-family: 'Apple Color Emoji', system-ui, sans-serif;
+}
+.app-glyph {
+  width: calc(var(--tile) * 0.42);
+  height: calc(var(--tile) * 0.42);
+  top: calc(var(--tile) * 0.05);
+  right: calc(var(--tile) * 0.05);
+}
+.image-glyph {
+  width: calc(var(--tile) * 0.32);
+  height: calc(var(--tile) * 0.32);
+  object-fit: cover;
+  border-radius: calc(var(--tile) * 0.08);
+}
+
+.label {
+  position: absolute;
+  left: calc(var(--tile) * 0.11);
+  right: calc(var(--tile) * 0.08);
+  bottom: calc(var(--tile) * 0.11);
+  font-family: var(--font-label);
+  font-weight: 700;
+  font-size: calc(var(--tile) * 0.142 * var(--label-scale, 1));
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(20, 4, 0, 0.35);
+  overflow-wrap: break-word;
+  -webkit-hyphens: manual;
+  hyphens: manual;
+  pointer-events: none;
+}
+
+.countdown {
+  position: absolute;
+  left: calc(var(--tile) * 0.11);
+  top: calc(var(--tile) * 0.1);
+  font-family: var(--font-label);
+  font-weight: 700;
+  font-size: calc(var(--tile) * 0.2);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Aufleuchten beim Tippen (nur opacity). */
+.flash {
+  position: absolute;
+  inset: 0;
+  border-radius: 28%;
+  background: radial-gradient(circle at 50% 45%, var(--c-flash) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 260ms ease-out;
+  pointer-events: none;
+}
+.flash.on { opacity: 1; transition-duration: 60ms; }
+
+.badge {
+  position: absolute;
+  top: calc(var(--frame) * 0.02);
+  left: calc(var(--frame) * 0.02);
+  width: calc(var(--frame) * 0.24);
+  height: calc(var(--frame) * 0.24);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--frame) * 0.14);
+  color: var(--c-ok-ink);
+  background: var(--c-ok);
+  box-shadow: 0 2px 6px var(--c-tile-shadow);
+  animation: badge-in 220ms var(--ease-spring) both;
+}
+.badge.error { background: var(--c-err); color: var(--c-err-ink); }
+
+@keyframes badge-in {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Nicht installiert */
+.missing-mark {
+  position: absolute;
+  top: calc(var(--tile) * 0.3);
+  right: calc(var(--tile) * 0.12);
+  font-family: var(--font-label);
+  font-weight: 700;
+  font-size: calc(var(--tile) * 0.36);
+  line-height: 1;
+  color: var(--c-missing-ink);
+}
+.missing-note {
+  position: absolute;
+  left: calc(var(--tile) * 0.11);
+  right: calc(var(--tile) * 0.11);
+  top: calc(var(--tile) * 0.1);
+  font-family: var(--font-label);
+  font-weight: 700;
+  font-size: calc(var(--tile) * 0.11);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-missing-ink);
+}
+.tile.missing { color: var(--c-missing-ink); }
+
+.empty { opacity: 0; transition: opacity 200ms; }
+.empty.visible { opacity: 1; }
+
+/* Bearbeitungsmodus: wackeln (nur transform). */
+:host(.is-editing) .frame {
+  animation: wiggle 300ms ease-in-out infinite alternate;
+  animation-delay: var(--wiggle-delay);
+}
+@keyframes wiggle {
+  from { transform: rotate(-1.6deg); }
+  to { transform: rotate(1.6deg); }
+}
+.delete {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(var(--frame) * 0.22);
+  height: calc(var(--frame) * 0.22);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--frame) * 0.13);
+  color: var(--c-text-cream);
+  background: var(--c-delete);
+  box-shadow: 0 1px 4px var(--c-tile-shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host(.is-editing) .frame { animation: none; }
+}
+
+/* Leere Plätze nur im Bearbeitungsmodus zeigen (Rahmen inklusive). */
+:host(.is-empty) .frame { opacity: 0; transition: opacity 200ms; }
+:host(.is-empty.is-editing) .frame { opacity: 1; }

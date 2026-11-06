@@ -1,0 +1,167 @@
+/*
+ * Copper Deck – Design-Tokens.
+ * Werte aus der Vorlage abgeleitet (Farbproben in DECISIONS.md dokumentiert).
+ * Keine weissen oder grauen Flächen.
+ */
+@font-face {
+  font-family: 'Barlow Condensed';
+  src: url('/fonts/barlow-condensed-latin-700-normal.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  src: url('/fonts/barlow-condensed-latin-600-normal.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: block;
+}
+
+:root {
+  /* Safe Areas (per ?safe=… simulierbar) */
+  --sa-t: env(safe-area-inset-top, 0px);
+  --sa-r: env(safe-area-inset-right, 0px);
+  --sa-b: env(safe-area-inset-bottom, 0px);
+  --sa-l: env(safe-area-inset-left, 0px);
+
+  /* Typografie */
+  --font-label: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+
+  /* Hintergrund: fast schwarzes Braun -> sattes Kupfer-Orange */
+  --c-bg-0: #170800;
+  --c-bg-1: #2a0f00;
+  --c-bg-2: #4c1b00;
+  --c-bg-3: #6c2602;
+  --c-bg-4: #8a3404;
+  --bg-base: radial-gradient(120% 110% at 60% 72%, var(--c-bg-4) 0%, var(--c-bg-3) 22%, var(--c-bg-2) 48%, var(--c-bg-1) 76%, var(--c-bg-0) 100%);
+  --bg-vignette: linear-gradient(100deg, rgba(14, 4, 0, 0.55) 0%, rgba(14, 4, 0, 0) 38%),
+    linear-gradient(180deg, rgba(14, 4, 0, 0.35) 0%, rgba(14, 4, 0, 0) 30%);
+  /* dezente vertikale Lichtstreifen (unregelmässig durch zwei überlagerte Perioden) */
+  --bg-streaks: repeating-linear-gradient(90deg, rgba(255, 150, 80, 0) 0 61px, rgba(255, 150, 80, 0.016) 61px 66px, rgba(255, 150, 80, 0) 66px 97px),
+    repeating-linear-gradient(90deg, rgba(255, 170, 100, 0) 0 143px, rgba(255, 170, 100, 0.024) 143px 151px, rgba(255, 170, 100, 0) 151px 229px),
+    repeating-linear-gradient(90deg, rgba(10, 2, 0, 0) 0 89px, rgba(10, 2, 0, 0.035) 89px 101px, rgba(10, 2, 0, 0) 101px 173px);
+
+  /* Gruppen-Container: leicht dunkler, feiner halbtransparenter Kupferrand */
+  --c-group-fill-top: rgba(14, 4, 0, 0.36);
+  --c-group-fill-bottom: rgba(14, 4, 0, 0.24);
+  --c-group-rim: rgba(255, 128, 52, 0.34);
+
+  /* Kachelrahmen: warm, transluzent, Innenleuchten */
+  --c-frame-fill-top: rgba(255, 158, 92, 0.15);
+  --c-frame-fill-bottom: rgba(255, 128, 60, 0.21);
+  --c-frame-rim: rgba(255, 150, 80, 0.38);
+  --c-frame-glow: rgba(255, 172, 112, 0.42);
+
+  /* Aktions-Kacheln */
+  --c-brown-top: #9a440e;
+  --c-brown-mid: #7f2a06;
+  --c-brown-bottom: #6a1b02;
+  --c-violet-top: #6d17a8;
+  --c-violet-mid: #57067f;
+  --c-violet-bottom: #46016b;
+  --c-text-cream: #f4cfa6;
+  --c-text-lilac: #ddb7ff;
+  --c-text-muted: rgba(244, 207, 166, 0.66);
+  --c-sheen: rgba(255, 214, 170, 0.12);
+  --c-bevel-hi: rgba(255, 222, 186, 0.6);
+  --c-bevel-lo: rgba(24, 4, 0, 0.5);
+  --c-tile-shadow: rgba(22, 6, 0, 0.6);
+  --c-flash: rgba(255, 214, 160, 0.55);
+
+  /* nicht installiert / leer */
+  --c-missing-top: rgba(60, 20, 2, 0.75);
+  --c-missing-bottom: rgba(40, 12, 0, 0.75);
+  --c-missing-rim: rgba(255, 150, 80, 0.55);
+  --c-missing-ink: rgba(244, 207, 166, 0.62);
+  --c-empty-rim: rgba(255, 150, 80, 0.35);
+
+  /* Emoji-Leiste, Pille, Buttons */
+  --c-bar-fill-top: rgba(16, 5, 0, 0.30);
+  --c-bar-fill-bottom: rgba(16, 5, 0, 0.18);
+  --c-bar-rim: rgba(255, 128, 52, 0.3);
+  --c-pill-fill-top: rgba(40, 12, 0, 0.5);
+  --c-pill-fill-bottom: rgba(70, 24, 2, 0.5);
+  --c-pill-rim: rgba(255, 140, 70, 0.34);
+  --c-pill-glow: rgba(255, 160, 100, 0.22);
+  --c-seg-fill-top: #7a3a14;
+  --c-seg-fill-bottom: #5a2509;
+  --c-seg-rim: rgba(255, 170, 110, 0.45);
+  --c-grabber: rgba(255, 150, 90, 0.28);
+
+  /* Dock */
+  --c-dock-fill-top: rgba(255, 140, 60, 0.22);
+  --c-dock-fill-bottom: rgba(160, 60, 10, 0.3);
+  --c-dock-rim: rgba(255, 150, 80, 0.55);
+  --c-dock-shadow: rgba(14, 3, 0, 0.7);
+
+  /* Seitenpunkte */
+  --c-dot: rgba(255, 150, 90, 0.3);
+  --c-dot-active: #f2d2b8;
+
+  /* Status */
+  --c-ok: #8fd98a;
+  --c-ok-ink: #12330e;
+  --c-err: #ff6f5c;
+  --c-err-ink: #3a0700;
+  --c-warn: #ffb36b;
+  --c-delete: #4b1700;
+
+  /* Overlays (statt backdrop-filter: deckender Verlauf) */
+  --c-scrim: linear-gradient(180deg, rgba(18, 6, 0, 0.9), rgba(30, 10, 0, 0.82));
+  --c-sheet-top: #3c1602;
+  --c-sheet-bottom: #2a0e00;
+  --c-toast: #3a1503;
+
+  /* Bewegung */
+  --t-press: 110ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* macOS-App-Icons: sichtbare Form = 824/1024 der Bildfläche */
+  --icon-overscan: 1.243;
+
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--c-bg-0);
+  color: var(--c-text-cream);
+  font-family: var(--font-ui);
+  /* Kein Rubber-Banding, keine Textauswahl, keine Callouts, kein Doppeltipp-Zoom */
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+body { position: fixed; inset: 0; }
+
+button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+img { -webkit-user-drag: none; }
+
+/* Squircle-Ebene (siehe SurfaceDirective) */
+.cd-surface { position: relative; isolation: isolate; }
+.cd-surface__svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.cd-safe-probe {
+  position: fixed;
+  visibility: hidden;
+  pointer-events: none;
+  padding: var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l);
+}
