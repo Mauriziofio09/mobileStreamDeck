@@ -6,3 +6,5 @@ dist/
 # Designvorlage und Vergleichsbilder nur lokal
 design-ref/
 screenshots/
+# Wird vor jedem Build erzeugt
+web/src/version.ts

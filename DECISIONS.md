@@ -254,3 +254,23 @@ Hier steht, was ich selbst entschieden habe. Neue Einträge kommen jeweils unten
 - **Speichern:** Der Helper vergibt einen Zufallsnamen (`<32 hex>.png`). `sips` rechnet das Bild in ein PNG mit höchstens 512 px um. Das prüft zugleich, dass es sich dekodieren lässt, und entfernt Metadaten. Gespeichert wird unter `media/`.
 - **Abruf:** Nur mit Token. Den Dateinamen prüfe ich streng, damit kein Pfad-Traversal möglich ist.
 - **Aufräumen:** Nicht mehr verwendete Bilder löscht der Helper nach dem Speichern, frische Uploads aber erst nach 15 Minuten, damit ein Upload aus einem noch offenen Editor erhalten bleibt.
+
+## Meilenstein 5 – PWA-Feinschliff, Updates, README
+
+### Icons und Splash-Screens
+- **Eigenes Motiv:** verschachtelte Rahmen mit 2×2 Kacheln in Braun und Violett auf Kupfer-Verlauf. Es entsteht aus derselben Squircle-Funktion wie die App. Gerendert wird mit Playwright WebKit (`tools/make-assets.mts`); Bildausschnitte aus der Vorlage verwende ich nicht.
+- **Icons:** `apple-touch-icon` (180), 192, 512, „maskable“ 512 (Motiv in der sicheren Zone), Favicons 32/64. iOS rundet das apple-touch-icon selbst ab, deshalb ist es randlos.
+- **Splash-Screens:** `apple-touch-startup-image` für 13 gängige iPhone- und iPad-Grössen, jeweils hoch- und querformatig (26 JPEGs, zusammen 1,2 MB), mit passenden Media-Queries in `index.html`. Sie liegen im Service Worker in einer Gruppe, die erst bei Bedarf lädt, damit Geräte nicht alle 26 Bilder herunterladen.
+- **Startansicht:** `index.html` enthält eine statische Ansicht (Verlauf, Icon, Schriftzug), bis Angular geladen ist. Sie ist nur CSS, ohne Inline-Skript, und passt damit zur CSP.
+- **Manifest:** `display: standalone`. iOS kennt `fullscreen` nicht; das Vollbild entsteht durch `black-translucent` + `viewport-fit=cover`. `orientation: landscape` ignoriert iOS, deshalb unterstützt die App beide Ausrichtungen.
+- **Bundle-Icon:** Das App-Bundle „Copper Deck Helper“ bekommt **kein** eigenes Icon. Ein Icon würde den Bundle-Inhalt und damit den Code-Hash ändern, und alle Berechtigungen müssten neu erteilt werden. Es erscheint daher mit dem Standard-Symbol in den Systemeinstellungen.
+
+### Updates über den Service Worker
+- **Prüfung** (`SwUpdate.checkForUpdate`) beim Start, bei `visibilitychange` und alle 30 Minuten.
+- **Kein automatischer Reload:** Bei `VERSION_READY` erscheint ein Hinweis mit „Aktualisieren“, damit nie mitten in einer Bedienung neu geladen wird. Ausnahme: Ist der Cache beschädigt (`unrecoverable`), lädt die App sofort neu.
+- **Versionsanzeige:** `tools/write-version.mjs` schreibt Version und Build-Zeit vor jedem Build in `web/src/version.ts`; About zeigt beides an.
+- **Geprüft** (`tools/e2e-m5-update.mjs`, gegen launchd): Version A ist geöffnet, Version B wird installiert. Der Hinweis erscheint, A läuft bis zum Tippen unverändert weiter, danach läuft B, und die Kopplung bleibt erhalten.
+
+### Testskripte
+- `e2e-m2-offline.mjs` stoppt den LaunchAgent jetzt mit `launchctl bootout/bootstrap`. Vorher hat es den Helper von Hand beendet und gestartet, was mit KeepAlive kollidiert.
+- `e2e-m2.mjs` erwartet keine „Kommt in M3“-Meldung mehr.

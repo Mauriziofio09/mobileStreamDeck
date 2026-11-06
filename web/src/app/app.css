@@ -162,3 +162,25 @@
 :host(.is-phone.is-portrait) .edit-bar { bottom: calc(var(--sa-b) + 14px); right: auto; left: 50%; transform: translateX(-50%); }
 :host(.is-phone.is-portrait) .edit-btn { height: 40px; padding: 0 22px; font-size: 17px; }
 :host(.is-phone.is-portrait.is-edit) .controls { display: none; }
+
+.update {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sa-b) + 16px);
+  transform: translateX(-50%);
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 8px 8px 18px;
+  border-radius: 999px;
+  background: var(--c-toast);
+  box-shadow: 0 0 0 1px var(--c-seg-rim), 0 8px 22px var(--c-tile-shadow);
+  color: var(--c-text-cream);
+  font: 500 15px var(--font-ui);
+  white-space: nowrap;
+  animation: lift 260ms var(--ease-spring) both;
+  --tx: -50%;
+}
+.update button { border: 0; background: transparent; color: var(--c-text-cream); font: 700 16px var(--font-label); text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 16px; }
+:host(.bar-inline) .update { bottom: calc(var(--sa-b) + 122px); }

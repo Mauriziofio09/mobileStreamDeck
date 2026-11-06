@@ -7,9 +7,33 @@
       "installMode": "prefetch",
       "updateMode": "prefetch",
       "resources": {
-        "files": ["/index.html", "/manifest.webmanifest", "/*.css", "/*.js", "/fonts/*.woff2"]
+        "files": [
+          "/index.html",
+          "/manifest.webmanifest",
+          "/*.css",
+          "/*.js",
+          "/fonts/*.woff2",
+          "/icons/icon-512.png",
+          "/icons/favicon-*.png"
+        ]
+      }
+    },
+    {
+      "name": "icons-splash",
+      "installMode": "lazy",
+      "updateMode": "lazy",
+      "resources": {
+        "files": [
+          "/icons/**",
+          "/splash/**"
+        ]
       }
     }
   ],
-  "navigationUrls": ["/**", "!/api/**", "!/ws", "!/**/*.*"]
+  "navigationUrls": [
+    "/**",
+    "!/api/**",
+    "!/ws",
+    "!/**/*.*"
+  ]
 }

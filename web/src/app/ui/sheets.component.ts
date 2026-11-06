@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import type { DeviceInfo } from '@copper-deck/shared';
 import { ActionService } from '../core/action.service';
+import { UpdateService } from '../core/update.service';
+import { APP_VERSION, BUILD_TIME } from '../../version';
 import { AuthService } from '../core/auth.service';
 import { ConnectionService } from '../core/connection.service';
 import { TimerPreset } from '@copper-deck/shared';
@@ -31,6 +33,10 @@ import { TIMER_LABEL, TIMER_MINUTES, TimerService } from '../core/timer.service'
               <dd>{{ host }}</dd>
               <dt>Dieses Gerät</dt>
               <dd>{{ conn.deviceName() || '–' }}</dd>
+              <dt>App</dt>
+              <dd>{{ appVersion }} · {{ buildTime }}
+                @if (updates.enabled) { <button type="button" class="link" (click)="checkUpdate()">Nach Update suchen</button> }
+              </dd>
               <dt>Helper</dt>
               <dd>{{ conn.helperVersion() || '–' }}</dd>
               <dt>Ansicht</dt>
@@ -111,6 +117,14 @@ export class SheetsComponent {
   protected readonly conn = inject(ConnectionService);
   private readonly auth = inject(AuthService);
   private readonly actions = inject(ActionService);
+  protected readonly updates = inject(UpdateService);
+  protected readonly appVersion = APP_VERSION;
+  protected readonly buildTime = new Date(BUILD_TIME).toLocaleString('de-CH', { dateStyle: 'short', timeStyle: 'short' });
+
+  protected async checkUpdate(): Promise<void> {
+    const found = await this.updates.check();
+    this.store.toast(found ? 'Neue Version wird geladen …' : 'Copper Deck ist aktuell.', 'info');
+  }
   protected readonly host = location.host;
   protected readonly devices = signal<DeviceInfo[] | null>(null);
 

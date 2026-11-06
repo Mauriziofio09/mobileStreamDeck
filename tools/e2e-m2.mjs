@@ -5,7 +5,7 @@ import { webkit } from 'playwright';
 import { execFileSync } from 'node:child_process';
 
 const URL_ = process.argv[2] ?? 'https://macbook-pro-von-maurizio.local:7443/';
-const cli = (...a) => execFileSync('helper/bin/copper-deck', a, { encoding: 'utf8' });
+const cli = (...a) => execFileSync('copper-deck', a, { encoding: 'utf8' });
 const step = (s) => console.log(`\n▶ ${s}`);
 
 const browser = await webkit.launch();
@@ -45,11 +45,10 @@ step('Aktion: App öffnen (Finder)');
 console.log('  Ergebnis:', await tap('Finder'));
 step('Aktion: Link öffnen (Google Fonts)');
 console.log('  Ergebnis:', await tap('Google Fonts'));
-step('Aktion aus Meilenstein 3 (Stage Manager) → verständlicher Fehler');
-console.log('  Ergebnis:', await tap('Stage Manager'), '–', (await page.textContent('.toast'))?.trim());
 
 const tokenInLs = await page.evaluate(() => !!localStorage.getItem('copperdeck.token'));
 console.log('\n  Token im localStorage der App:', tokenInLs);
+cli('revoke', await page.evaluate(() => localStorage.getItem('copperdeck.device')));
 await page.close();
 await ctx.close();
 await browser.close();

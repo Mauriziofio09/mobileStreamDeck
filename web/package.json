@@ -6,7 +6,9 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "prebuild": "node ../tools/write-version.mjs",
+    "prestart": "node ../tools/write-version.mjs"
   },
   "private": true,
   "packageManager": "npm@12.0.2",

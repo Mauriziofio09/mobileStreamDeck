@@ -13,6 +13,7 @@ import { PairingComponent } from './ui/pairing.component';
 import { SideControlsComponent } from './ui/side-controls.component';
 import { TileEditorComponent } from './ui/tile-editor.component';
 import { EditorService } from './core/editor.service';
+import { UpdateService } from './core/update.service';
 
 @Component({
   selector: 'app-root',
@@ -34,6 +35,7 @@ export class App {
   protected readonly layout = this.layoutService.layout;
   protected readonly conn = inject(ConnectionService);
   protected readonly editor = inject(EditorService);
+  protected readonly updates = inject(UpdateService);
 
   /** Kopplung, Offline-Vollbild (noch nie Konfiguration erhalten) oder das Deck. */
   protected readonly view = computed<'pairing' | 'offline' | 'deck'>(() => {

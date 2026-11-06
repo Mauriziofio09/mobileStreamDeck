@@ -5,6 +5,7 @@
   <title>Copper Deck</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Touch-Panel für den Mac">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -12,9 +13,55 @@
   <meta name="theme-color" content="#170800">
   <meta name="format-detection" content="telephone=no">
   <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="preload" href="fonts/barlow-condensed-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <!-- splash:start (tools/make-assets.mts) -->
+  <link rel="apple-touch-startup-image" href="splash/splash-750x1334.jpg" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"><!-- iPhone SE -->
+  <link rel="apple-touch-startup-image" href="splash/splash-1334x750.jpg" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"><!-- iPhone SE -->
+  <link rel="apple-touch-startup-image" href="splash/splash-1170x2532.jpg" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"><!-- iPhone 13/14 -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2532x1170.jpg" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)"><!-- iPhone 13/14 -->
+  <link rel="apple-touch-startup-image" href="splash/splash-1179x2556.jpg" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"><!-- iPhone 14 Pro/15/16 -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2556x1179.jpg" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)"><!-- iPhone 14 Pro/15/16 -->
+  <link rel="apple-touch-startup-image" href="splash/splash-1206x2622.jpg" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"><!-- iPhone 16 Pro/17 -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2622x1206.jpg" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)"><!-- iPhone 16 Pro/17 -->
+  <link rel="apple-touch-startup-image" href="splash/splash-1260x2736.jpg" media="(device-width: 420px) and (device-height: 912px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"><!-- iPhone Air -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2736x1260.jpg" media="(device-width: 420px) and (device-height: 912px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)"><!-- iPhone Air -->
+  <link rel="apple-touch-startup-image" href="splash/splash-1290x2796.jpg" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"><!-- iPhone Plus/Pro Max -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2796x1290.jpg" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)"><!-- iPhone Plus/Pro Max -->
+  <link rel="apple-touch-startup-image" href="splash/splash-1320x2868.jpg" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"><!-- iPhone 16/17 Pro Max -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2868x1320.jpg" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: landscape)"><!-- iPhone 16/17 Pro Max -->
+  <link rel="apple-touch-startup-image" href="splash/splash-1488x2266.jpg" media="(device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"><!-- iPad mini -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2266x1488.jpg" media="(device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"><!-- iPad mini -->
+  <link rel="apple-touch-startup-image" href="splash/splash-1640x2360.jpg" media="(device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"><!-- iPad 10/Air 11 -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2360x1640.jpg" media="(device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"><!-- iPad 10/Air 11 -->
+  <link rel="apple-touch-startup-image" href="splash/splash-1668x2388.jpg" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"><!-- iPad Pro 11 (alt) -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2388x1668.jpg" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"><!-- iPad Pro 11 (alt) -->
+  <link rel="apple-touch-startup-image" href="splash/splash-1668x2420.jpg" media="(device-width: 834px) and (device-height: 1210px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"><!-- iPad Pro 11 (M4) -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2420x1668.jpg" media="(device-width: 834px) and (device-height: 1210px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"><!-- iPad Pro 11 (M4) -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2048x2732.jpg" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"><!-- iPad Air 13/Pro 12.9 -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2732x2048.jpg" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"><!-- iPad Air 13/Pro 12.9 -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2064x2752.jpg" media="(device-width: 1032px) and (device-height: 1376px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"><!-- iPad Pro 13 (M4) -->
+  <link rel="apple-touch-startup-image" href="splash/splash-2752x2064.jpg" media="(device-width: 1032px) and (device-height: 1376px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"><!-- iPad Pro 13 (M4) -->
+  <!-- splash:end -->
+  <style>
+    /* Start-Ansicht, bis Angular geladen ist (wird beim Start ersetzt) */
+    html, body { margin: 0; height: 100%; background: #170800; }
+    .boot {
+      position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 22px;
+      background: radial-gradient(120% 110% at 60% 72%, #8a3404 0%, #6c2602 22%, #4c1b00 48%, #2a0f00 76%, #170800 100%);
+    }
+    .boot img { width: 22vmin; height: 22vmin; border-radius: 22%; }
+    .boot span { font: 700 7vmin/1 'Barlow Condensed', 'Arial Narrow', sans-serif; letter-spacing: .04em; color: #f4cfa6; text-transform: uppercase; }
+  </style>
 </head>
 <body>
-  <app-root></app-root>
+  <app-root>
+    <div class="boot" aria-hidden="true">
+      <img src="icons/icon-512.png" alt="">
+      <span>Copper Deck</span>
+    </div>
+  </app-root>
 </body>
 </html>
