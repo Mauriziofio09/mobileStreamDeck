@@ -37,7 +37,7 @@ import { IconComponent } from './icons';
         (click)="store.sheet.set('about')"
       >
         @if (store.sheet() === 'about') { <span class="seg-bg" cdSurface="segment" [cdRadius]="0.5"></span> }
-        <span class="seg-icon about-icon"><cd-icon name="info" /><span class="conn" [attr.data-state]="conn.state()"></span></span>
+        <span class="seg-icon about-icon"><cd-icon name="info" /><span class="conn" [attr.data-state]="permMissing() ? 'perm' : conn.state()"></span></span>
         <span class="seg-label">About</span>
       </button>
       <button type="button" class="seg" [class.active]="store.barActive()" (click)="store.toggleBar()">
@@ -54,5 +54,9 @@ export class SideControlsComponent {
   protected readonly timers = inject(TimerService);
   protected readonly conn = inject(ConnectionService);
   private readonly layout = inject(LayoutService);
+  protected readonly permMissing = computed(() => {
+    const p = this.conn.permissions();
+    return !!p && (p.accessibility !== 'granted' || p.automation !== 'granted' || p.notifications !== 'granted');
+  });
   protected readonly vertical = computed(() => this.layout.layout().controls === 'side');
 }

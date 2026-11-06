@@ -208,7 +208,7 @@ export class TileComponent {
     this.status.set('busy');
     const result = await this.actions.run(t.id);
     this.status.set(result.ok ? 'ok' : 'error');
-    if (!result.ok) this.store.toast(result.reason, 'error');
+    if (!result.ok) this.store.toast(result.permission ? `${result.reason} (Details unter About)` : result.reason, 'error');
     else if (result.message) this.store.toast(result.message, 'info');
     if (this.statusTimer) clearTimeout(this.statusTimer);
     this.statusTimer = setTimeout(() => this.status.set('idle'), result.ok ? 900 : 1800);

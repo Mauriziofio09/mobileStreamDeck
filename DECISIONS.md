@@ -131,3 +131,87 @@ Hier steht, was ich selbst entschieden habe. Neue Einträge kommen jeweils unten
 ### Behobener Fehler aus dem E2E-Test
 - Ein sofortiger Neustart nach SIGTERM scheiterte: Der alte Prozess beantwortete den Admin-Socket noch bis zu 3 s.
 - Jetzt schliesst der Helper beim Beenden zuerst den Socket und trennt offene HTTP-Verbindungen aktiv. Beim Start wartet er bis zu 6 s auf einen auslaufenden Vorgänger. Das ist auch für die launchd-Neustarts in M3 wichtig.
+
+## Meilenstein 3 – Aktionen, LaunchAgent, Berechtigungen, Timer
+
+### Berechtigungen: App-Bundle als verantwortlicher Prozess
+- `~/Applications/Copper Deck Helper.app`, Bundle-ID `ch.copperdeck.helper`, ad-hoc signiert, `LSUIElement` (kein Dock-Symbol).
+- **Hauptprogramm:** ein kleines Swift-Programm (`helper/native/CopperDeckHelper.swift`).
+  - Mit `serve` startet es node als Kindprozess und reicht SIGTERM, SIGINT und SIGHUP weiter.
+  - Die anderen Unterbefehle (Fenster, Zwischenablage, Mitteilung, Berechtigungen, Stage-Manager-Zustand, Icons) ruft der Helper per `execFile` auf.
+- **Warum:** macOS ordnet Berechtigungen dem verantwortlichen Prozess zu. launchd startet das Bundle, und node, osascript und die Unterbefehle erben diese Verantwortlichkeit. Die Rechte hängen damit am Bundle und nicht an node. **Ein Node-Update ändert sie nicht.**
+- **Das Bundle enthält nur Programm und Info.plist.** Bei ad-hoc-Signaturen ist die Identität der Code-Hash. Würde ich JS- oder Web-Dateien ins Bundle legen, wären die Berechtigungen nach jedem Update weg. Diese Dateien liegen deshalb unter `runtime/`.
+  - `install.sh` baut das Bundle nur neu, wenn sich der Swift-Code ändert (Quell-Hash in der Info.plist).
+  - Ändert sich der Swift-Code, musst du die Berechtigungen neu erteilen. Das Skript weist darauf hin.
+- **Geprüft:**
+  - Aus dem Terminal meldet das Bundle „Bedienungshilfen erteilt“, weil das Terminal sie hat.
+  - Unter launchd meldete es zunächst „fehlt“. Damit ist belegt, dass Terminal-Rechte nicht übertragen werden.
+  - Nach dem Erteilen für „Copper Deck Helper“ liefen alle Aktionen unter launchd.
+- **node:** wird über den stabilen Homebrew-Symlink `/opt/homebrew/bin/node` gestartet (`runtime/launch.json`).
+- **Firewall – Einschränkung:** Die Firewall regelt pro lauschender Binary, und das ist node unter einem versionierten Cellar-Pfad. Nach `brew upgrade node` fragt sie erneut.
+  - Alternative: eine node-Kopie in `runtime/`. Das ergibt einen stabilen Pfad, dafür aber keine automatischen Sicherheitsupdates von node.
+  - Entscheidung: Ich habe das nicht umgesetzt, weil die Firewall bei dir aus ist. Ich baue es um, wenn du das möchtest.
+
+### Berechtigungsprüfung
+- **Was geprüft wird:**
+  - Bedienungshilfen: `AXIsProcessTrusted`.
+  - Automation: `AEDeterminePermissionToAutomateTarget` für System Events; System Events wird dafür bei Bedarf unsichtbar gestartet.
+  - Mitteilungen: `UNUserNotificationCenter`.
+- **Wann geprüft wird:**
+  - Beim Start und nach jedem passenden Fehler (osascript -1743, 1002 / -1719 / -25211).
+  - Solange etwas fehlt, alle 3 s, sonst jede Minute. Änderungen gehen sofort an alle Geräte.
+- **Systemdialoge** (Bedienungshilfen-Eintrag, Mitteilungen) erscheinen nur beim **ersten** Start im App-Kontext (Marker `permissions-prompted`), damit KeepAlive-Neustarts nicht ständig Dialoge zeigen. Über die App lassen sie sich erneut auslösen.
+- **App:** About zeigt den Stand, den genauen Pfad in den Systemeinstellungen und den Knopf „Am Mac öffnen“ (feste System-Aktion `sys-settings-*`). Fehlt eine Berechtigung, zeigt das About-Segment einen roten Punkt.
+
+### System-Aktionen
+- Es gibt feste IDs, die nicht konfigurierbar sind: `sys-timer-*`, `sys-settings-*`, `sys-request-permissions`. Konfigurations-IDs dürfen nicht mit `sys-` beginnen (Schema).
+- Für Tests unter launchd führt der Admin-Socket (nur lokal, Rechte 600) mit `runAction` eine streng typisierte Aktion aus.
+
+### App öffnen: kooperative Aktivierung (Fund aus dem Test)
+- **Problem:** Seit macOS 14 holt `open -b` die App aus einem Hintergrundprozess heraus **nicht** nach vorne, wenn gerade jemand eine andere App benutzt. Geprüft: Die Claude-App blieb vorne. Der Test aus M2 hatte das nicht bemerkt.
+- **Lösung:** Nach `open -b` setzt `activate.applescript` (argv: Bundle-ID) über System Events `frontmost`. Das braucht Bedienungshilfen und Automation.
+- **Fehlen diese Rechte,** wird die App trotzdem geöffnet, und die Antwort sagt, dass sie nicht nach vorne kam und warum.
+
+### Tastenkombination
+- AppleScript `keystroke.applescript` mit `on run argv`. Die Werte kommen nur als Argumente, das Skript liegt in `runtime/` und nicht im Bundle.
+- **Buchstaben:** über `keystroke`, das dem aktiven Layout folgt. Auf Schweizerdeutsch landen Z und Y damit richtig.
+- **Ziffern und Sondertasten:** über `key code`. `keystroke "1" using shift down` hat Shift ignoriert und „1“ geschrieben statt „+“. Die Ziffernreihe liegt auf QWERTZ und QWERTY an denselben Tasten.
+- **Test unter launchd mit Schweizer Layout:** z, y, ⇧1, Leerzeichen, ⇧7, ⇧a ergaben „zy+ /A“, korrekt.
+
+### Fenster anordnen
+- **Auswahl:** CGWindowList in Z-Reihenfolge (von vorne nach hinten), Ebene 0. Eigene Prozesse sowie Dock, WindowManager und Kontrollzentrum zählen nicht. Die passenden AX-Fenster finde ich über `_AXUIElementGetWindow`, eine private, aber gängige API, ohne die sich CG- und AX-Fenster nicht sicher zuordnen lassen. Berücksichtigt werden nur `AXStandardWindow`, die nicht minimiert sind; die ersten 4 davon.
+- **Zielbereich:** `visibleFrame` des Hauptbildschirms (mit Menüleiste), also ohne Menüleiste und Dock.
+- **Raster:** 1 Fenster = ganzer Bereich; 2 = zwei Spalten; 3 = links eins über die volle Höhe, rechts zwei übereinander; 4 = 2×2.
+- **Kontrolle:** Danach lese ich den tatsächlichen Rahmen aus (Toleranz 12 px). Abweichungen kommen in die Antwort, zum Beispiel „IntelliJ IDEA: Mindestgrösse zu gross“ (so beim Test auf deinem Mac).
+
+### Stage Manager – Vergleich
+| Variante | Ergebnis |
+|---|---|
+| `defaults write com.apple.WindowManager GloballyEnabled` | **wirkt unter macOS 27 sofort** (getestet aus dem Terminal und unter launchd) |
+| Kurzbefehle-Aktion „Stage Manager festlegen“ | zuverlässig, aber der Kurzbefehl müsste von Hand angelegt werden, weil er sich nicht automatisch erstellen lässt |
+| UI-Skripting im Kontrollzentrum | hängt an lokalisierten Bezeichnungen und am Aufbau des Kontrollzentrums, deshalb anfällig |
+- **Gewählt:** `defaults`.
+- **Kontrolle des tatsächlichen Zustands:**
+  - Die Einstellung wird erneut gelesen.
+  - Zusätzlich müssen die Miniaturen im Seitenstreifen (sichtbare `WindowManager`-Fenster) erscheinen bzw. verschwinden. Gewartet wird bis zu 6 s; beim ersten Test reichten 3 s nicht.
+- **Ein- ohne Streifen:** Ist Stage Manager laut Einstellung an, aber kein Streifen zu sehen (keine weiteren Fenster), sagt die Antwort das ausdrücklich.
+
+### Timer
+- Der Helper speichert `{preset, startedAt, endsAt}` in `timer.json` (atomar, Rechte 600) und schickt den Zustand mit `serverNow` an alle Geräte. Die Geräte zählen mit korrigierter Uhrabweichung herunter, damit überall derselbe Countdown läuft.
+- Es läuft immer nur ein Timer: derselbe noch einmal = stoppen, der andere = ersetzen.
+- Ein Neustart des Helpers (getestet mit `launchctl kickstart -k`) behält den Timer.
+- Ist der Timer abgelaufen, während der Helper aus war, wird die Mitteilung nachgeholt, sofern das höchstens 15 Minuten her ist.
+- **Mitteilung:** über `UNUserNotificationCenter` aus dem Bundle, damit sie als „Copper Deck Helper“ erscheint und eine eigene Einstellung hat. `osascript display notification` würde dagegen als „Skripteditor“ erscheinen.
+
+### Emoji einfügen
+- **Ablauf im nativen Programm:**
+  1. Alle Einträge der Zwischenablage mit **allen** Datentypen sichern, nur im Speicher und ohne temporäre Dateien.
+  2. Das Emoji mit `org.nspasteboard.TransientType` und `AutoGeneratedType` setzen, damit Zwischenablage-Manager es ignorieren.
+  3. ⌘V über System Events senden.
+  4. Nach 450 ms wiederherstellen, aber nur, wenn inzwischen niemand etwas Neues kopiert hat (`changeCount`).
+- **Test unter launchd:** In der Zwischenablage lagen ein PNG und eine Datei-URL. Danach waren Typen und SHA-256 identisch.
+- **Nebenbefund:** Schreibt ein Prozess eine Datei-URL per `setString` und beendet sich sofort, verwirft macOS den Eintrag. Mit `setData`, wie der Helper es macht, bleibt er erhalten. Das ist mit getrennten Prozessen geprüft.
+
+### Testvorfall
+- Der erste Lauf von `e2e-m3-perms` hat Tastendrücke gesendet, während die **Claude-App** vorne war, weil TextEdit wegen der kooperativen Aktivierung nicht nach vorne kam. Betroffen waren „🥰zy+ /“, ⌘S und ⌘W.
+- Der Test prüft jetzt vor **jedem** Tastendruck, ob TextEdit vorne ist, und bricht sonst ab. ⌘W sendet er nicht mehr.

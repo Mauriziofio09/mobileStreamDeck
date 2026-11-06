@@ -11,7 +11,10 @@ export type AdminRequest =
   | { cmd: 'devices' }
   | { cmd: 'revoke'; id: string }
   | { cmd: 'status' }
-  | { cmd: 'reloadTls' };
+  | { cmd: 'reloadTls' }
+  | { cmd: 'permissions' }
+  | { cmd: 'runAction'; action: unknown }
+  | { cmd: 'notifyTest' };
 
 export type AdminHandler = (req: AdminRequest) => Promise<unknown>;
 

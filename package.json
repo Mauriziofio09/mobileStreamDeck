@@ -1,7 +1,7 @@
 {
   "name": "copper-deck",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "workspaces": [
     "shared",
     "web",
@@ -13,7 +13,9 @@
     "helper": "helper/bin/copper-deck serve",
     "screenshots": "node tools/screenshots.mjs",
     "compare": "node tools/compare.mjs",
-    "e2e": "node tools/e2e-m2.mjs && node tools/e2e-m2-offline.mjs /tmp/copper-deck-e2e-helper.log"
+    "e2e": "node tools/e2e-m2.mjs && node tools/e2e-m2-offline.mjs /tmp/copper-deck-e2e-helper.log",
+    "install-agent": "scripts/install.sh",
+    "e2e:launchd": "node tools/e2e-m3.mjs basic && node tools/e2e-m3-perms.mjs"
   },
   "devDependencies": {
     "playwright": "1.65.0",

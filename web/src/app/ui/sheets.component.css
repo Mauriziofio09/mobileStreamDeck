@@ -77,3 +77,13 @@ h3 { margin: 18px 0 8px; font: 700 18px var(--font-label); text-transform: upper
 
 @keyframes fade { from { opacity: 0; } }
 @keyframes rise { from { opacity: 0; transform: translateY(16px) scale(0.97); } }
+
+.perms { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.perms li { display: grid; grid-template-columns: 22px 1fr auto; column-gap: 10px; row-gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--c-group-fill-top); box-shadow: inset 0 0 0 1px var(--c-warn); }
+.perms li.ok { box-shadow: inset 0 0 0 1px var(--c-frame-rim); }
+.pstate { grid-row: 1 / span 2; font-weight: 700; color: var(--c-warn); }
+.perms li.ok .pstate { color: var(--c-ok); }
+.pname { font-size: 15px; }
+.pdesc { grid-column: 2; font-size: 12.5px; color: var(--c-text-muted); line-height: 1.35; }
+.fix { grid-column: 3; grid-row: 1 / span 2; align-self: center; border: 1px solid var(--c-seg-rim); border-radius: 999px; background: transparent; color: var(--c-text-cream); font: 600 13px var(--font-ui); padding: 6px 12px; white-space: nowrap; }
+.link { border: 0; background: transparent; color: var(--c-text-lilac); font: 600 13px var(--font-ui); padding: 0 4px; text-decoration: underline; }

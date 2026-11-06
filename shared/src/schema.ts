@@ -7,6 +7,8 @@ import { CONFIG_SCHEMA_VERSION, HOTKEY_KEYS, MODIFIERS, TILES_PER_GROUP } from '
 import { ID_PATTERN } from './protocol';
 
 const id = z.string().regex(ID_PATTERN);
+/** IDs in der Konfiguration: "sys-" ist für feste System-Aktionen reserviert. */
+const configId = id.refine((v) => !v.startsWith('sys-'), 'Präfix sys- ist reserviert');
 export const BUNDLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9.-]{0,199}$/;
 const bundleId = z.string().regex(BUNDLE_ID_PATTERN);
 /** Ein Emoji bzw. eine kurze Zeichenfolge ohne Steuerzeichen. */
@@ -51,11 +53,11 @@ const tileIcon = z.discriminatedUnion('type', [
 
 export const tileSchema = z.discriminatedUnion('kind', [
   z.object({
-    id, kind: z.literal('app'), label,
+    id: configId, kind: z.literal('app'), label,
     action: z.object({ type: z.literal('openApp'), bundleId }).strict(),
   }).strict(),
   z.object({
-    id, kind: z.literal('action'), label,
+    id: configId, kind: z.literal('action'), label,
     color: z.enum(['brown', 'violet']),
     icon: tileIcon,
     action: actionSchema,
@@ -66,9 +68,9 @@ export const deckConfigSchema = z
   .object({
     schemaVersion: z.literal(CONFIG_SCHEMA_VERSION),
     revision: z.number().int().nonnegative(),
-    groups: z.array(z.object({ id, tiles: z.array(tileSchema.nullable()).length(TILES_PER_GROUP) }).strict()).max(64),
-    emojis: z.array(z.object({ id, emoji }).strict()).max(16),
-    dock: z.array(z.object({ id, bundleId, label }).strict()).max(40),
+    groups: z.array(z.object({ id: configId, tiles: z.array(tileSchema.nullable()).length(TILES_PER_GROUP) }).strict()).max(64),
+    emojis: z.array(z.object({ id: configId, emoji }).strict()).max(16),
+    dock: z.array(z.object({ id: configId, bundleId, label }).strict()).max(40),
   })
   .strict()
   .superRefine((cfg, ctx) => {

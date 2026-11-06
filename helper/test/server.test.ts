@@ -14,7 +14,10 @@ import type { AppCatalog } from '../src/apps';
 import { ConfigStore } from '../src/config-store';
 import { DeviceStore } from '../src/devices';
 import { ExecError, type Exec } from '../src/exec';
+import type { Native, NativeResult } from '../src/native';
 import { PAIR_CODE_TTL_MS, PairingManager } from '../src/pairing';
+import { PermissionMonitor } from '../src/permissions';
+import { TimerManager } from '../src/timer';
 import { createServer } from '../src/server';
 
 process.env['COPPER_DECK_QUIET'] = '1';
@@ -36,6 +39,21 @@ const fakeExec: Exec = async (file, args) => {
   }
   return { stdout: '', stderr: '' };
 };
+
+/** Native-Attrappe: zeichnet Aufrufe auf. */
+const nativeCalls: (readonly string[])[] = [];
+let nativeReply: (args: readonly string[]) => NativeResult = () => ({ ok: true });
+const fakeNative = {
+  available: true,
+  binary: '/fake',
+  call: async (args: readonly string[]) => { nativeCalls.push(args); return nativeReply(args); },
+} as unknown as Native;
+const notifications: string[] = [];
+function makeRunner(exec: Exec = fakeExec, timerFile = path.join(dir, `timer-${Math.random()}.json`)) {
+  const permissions = new PermissionMonitor(fakeNative, 'app');
+  const timers = new TimerManager(timerFile, async (t) => { notifications.push(t); return true; });
+  return { runner: new ActionRunner({ exec, native: fakeNative, timers, permissions, keystrokeScript: '/k.applescript', activateScript: '/a.applescript' }), timers, permissions };
+}
 
 const catalogStub = {
   list: async () => [{ bundleId: 'com.apple.finder', name: 'Finder' }],
@@ -63,9 +81,10 @@ before(async () => {
   await new Promise<void>((r) => probe.close(() => r()));
   origin = `https://localhost:${port}`;
   base = origin;
+  const r = makeRunner();
   srv = createServer({
     devices, pairing, config, catalog: catalogStub,
-    runner: new ActionRunner(fakeExec),
+    runner: r.runner, timers: r.timers, permissions: r.permissions,
     origins: [origin],
     webRoot: path.join(dir, 'no-web'),
     tls: { key: readFileSync(`${dir}/key.pem`), cert: readFileSync(`${dir}/cert.pem`) },
@@ -269,6 +288,7 @@ describe('WebSocket', () => {
     const r1 = await c.next('result');
     assert.equal(r1.ok, true);
     assert.deepEqual(calls[0], { file: '/usr/bin/open', args: ['-b', 'com.apple.finder'] });
+    assert.deepEqual(calls[1], { file: '/usr/bin/osascript', args: ['/a.applescript', 'com.apple.finder'] }, 'App wird danach in den Vordergrund geholt');
     c.ws.close();
 
     const c2 = connect();
@@ -278,7 +298,7 @@ describe('WebSocket', () => {
     c2.ws.send(JSON.stringify({ type: 'run', requestId: 'r-url', actionId: 't-gfonts' }));
     const r2 = await c2.next('result');
     assert.equal(r2.ok, true);
-    assert.deepEqual(calls[1], { file: '/usr/bin/open', args: ['https://fonts.google.com/'] });
+    assert.deepEqual(calls[2], { file: '/usr/bin/open', args: ['https://fonts.google.com/'] });
     c2.ws.close();
   });
 
@@ -297,12 +317,12 @@ describe('WebSocket', () => {
 
 describe('Aktionen und Konfiguration', () => {
   test('nicht installierte App liefert verständlichen Fehler', async () => {
-    const r = await new ActionRunner(fakeExec).run({ type: 'openApp', bundleId: 'com.example.missing' });
+    const r = await makeRunner().runner.run({ type: 'openApp', bundleId: 'com.example.missing' });
     assert.deepEqual(r, { ok: false, code: 'app_not_found', message: 'Diese App ist auf dem Mac nicht installiert.' });
   });
 
   test('Links nur http/https', async () => {
-    const runner = new ActionRunner(fakeExec);
+    const { runner } = makeRunner();
     for (const url of ['javascript:alert(1)', 'file:///etc/passwd', 'x-apple.systempreferences:', 'ftp://a.b']) {
       const r = await runner.run({ type: 'openUrl', url });
       assert.equal(r.ok, false, url);
@@ -328,5 +348,133 @@ describe('Aktionen und Konfiguration', () => {
     assert.equal(deckConfigSchema.safeParse(cfg).success, true);
     assert.equal(cfg.groups.length, 2);
     assert.equal(cfg.emojis.map((e) => e.emoji).join(''), '😂🤩🤣❤️😱😘😍🥰');
+  });
+});
+
+describe('Meilenstein 3: Aktionen', () => {
+  test('Tastenkombination: Werte nur als osascript-Argumente; Sondertasten als Keycode', async () => {
+    const { runner } = makeRunner();
+    calls.length = 0;
+    assert.equal((await runner.run({ type: 'hotkey', modifiers: ['command', 'shift'], key: 'z' })).ok, true);
+    assert.equal((await runner.run({ type: 'hotkey', modifiers: ['control'], key: 'up' })).ok, true);
+    assert.deepEqual(calls[0], { file: '/usr/bin/osascript', args: ['/k.applescript', 'z', 'command', 'shift'] });
+    assert.deepEqual(calls[1], { file: '/usr/bin/osascript', args: ['/k.applescript', 'code:126', 'control'] });
+    assert.equal((await runner.run({ type: 'hotkey', modifiers: ['command', 'shift'], key: '4' })).ok, true);
+    assert.deepEqual(calls[2], { file: '/usr/bin/osascript', args: ['/k.applescript', 'code:21', 'command', 'shift'] }, 'Ziffern als Keycode (⌘⇧4)');
+  });
+
+  test('Tastenkombination: unbekannte Taste/Modifier wird abgelehnt', async () => {
+    const { runner } = makeRunner();
+    calls.length = 0;
+    const r1 = await runner.run({ type: 'hotkey', modifiers: ['command'], key: '" & do shell script "x' } as never);
+    const r2 = await runner.run({ type: 'hotkey', modifiers: ['hyper'], key: 'a' } as never);
+    assert.equal(r1.ok, false);
+    assert.equal(r2.ok, false);
+    assert.equal(calls.length, 0);
+  });
+
+  test('fehlende Berechtigungen werden erkannt und erklärt', async () => {
+    const deny = (stderr: string): Exec => async () => { throw new ExecError('x', 1, stderr, false); };
+    const a = await makeRunner(deny('execution error: Not authorized to send Apple events to System Events. (-1743)')).runner.run({ type: 'hotkey', modifiers: [], key: 'a' });
+    assert.equal(a.ok === false && a.permission, 'automation');
+    assert.match(a.ok === false ? a.message : '', /Automation/);
+    const b = await makeRunner(deny('System Events got an error: osascript is not allowed to send keystrokes. (1002)')).runner.run({ type: 'hotkey', modifiers: [], key: 'a' });
+    assert.equal(b.ok === false && b.permission, 'accessibility');
+    assert.match(b.ok === false ? b.message : '', /Bedienungshilfen/);
+  });
+
+  test('Fenster anordnen: nicht anpassbare Fenster werden gemeldet', async () => {
+    nativeReply = () => ({ ok: true, count: 3, windows: [
+      { app: 'Safari', title: 'A', ok: true, reason: '' },
+      { app: 'Rechner', title: '', ok: false, reason: 'Grösse nicht änderbar' },
+      { app: 'Mail', title: 'B', ok: true, reason: '' },
+    ] });
+    const r = await makeRunner().runner.run({ type: 'tileWindows' });
+    assert.equal(r.ok, true);
+    assert.match(r.ok ? r.message ?? '' : '', /2 von 3 angeordnet.*Rechner: Grösse nicht änderbar/);
+    nativeReply = () => ({ ok: false, error: 'accessibility' });
+    const r2 = await makeRunner().runner.run({ type: 'tileWindows' });
+    assert.equal(r2.ok === false && r2.permission, 'accessibility');
+    nativeReply = () => ({ ok: true });
+  });
+
+  test('Stage Manager: schaltet per defaults und prüft den tatsächlichen Zustand', async () => {
+    let pref = false;
+    const exec: Exec = async (file, args) => {
+      calls.push({ file, args });
+      if (file === '/usr/bin/defaults') pref = args[4] === 'true';
+      return { stdout: '', stderr: '' };
+    };
+    nativeReply = (a) => (a[0] === 'stage-manager-state' ? { ok: true, pref, strip: pref ? 3 : 0 } : { ok: true });
+    calls.length = 0;
+    const { runner } = makeRunner(exec);
+    const on = await runner.run({ type: 'stageManager' });
+    assert.deepEqual(calls[0], { file: '/usr/bin/defaults', args: ['write', 'com.apple.WindowManager', 'GloballyEnabled', '-bool', 'true'] });
+    assert.equal(on.ok && on.message, 'Stage Manager ist an.');
+    const off = await runner.run({ type: 'stageManager' });
+    assert.equal(off.ok && off.message, 'Stage Manager ist aus.');
+    // Einstellung greift nicht -> Fehler statt falscher Erfolgsmeldung
+    nativeReply = (a) => (a[0] === 'stage-manager-state' ? { ok: true, pref: false, strip: 0 } : { ok: true });
+    const stuck = await makeRunner(async () => ({ stdout: '', stderr: '' })).runner.run({ type: 'stageManager' });
+    assert.equal(stuck.ok, false);
+    nativeReply = () => ({ ok: true });
+  });
+
+  test('Emoji: über das native Programm, Zwischenablage-Ergebnis wird gemeldet', async () => {
+    nativeCalls.length = 0;
+    nativeReply = () => ({ ok: true, restored: true, items: 2 });
+    const r = await makeRunner().runner.run({ type: 'insertEmoji', emoji: '🥰' });
+    assert.equal(r.ok, true);
+    assert.deepEqual(nativeCalls[0], ['insert-emoji', '🥰', '/k.applescript']);
+    nativeReply = () => ({ ok: true });
+  });
+
+  test('Timer: einer läuft, erneut = stoppen, anderer ersetzt; Endzeit überlebt Neustart', async () => {
+    let now = 1_000_000;
+    const file = path.join(dir, 'timer-restart.json');
+    const t1 = new TimerManager(file, async () => true, () => now);
+    assert.equal(await t1.toggle('pomodoro'), 'started');
+    assert.equal(t1.get()?.endsAt, now + 25 * 60_000);
+    assert.equal(await t1.toggle('break'), 'replaced');
+    assert.equal(t1.get()?.preset, 'break');
+    t1.dispose();
+    // "Neustart": neuer Manager liest dieselbe Endzeit
+    const t2 = new TimerManager(file, async () => true, () => now + 60_000);
+    await t2.load();
+    assert.equal(t2.get()?.preset, 'break');
+    assert.equal(t2.get()?.endsAt, now + 5 * 60_000);
+    assert.equal(await t2.toggle('break'), 'stopped');
+    assert.equal(t2.get(), null);
+    t2.dispose();
+  });
+
+  test('Timer: Ablauf löst eine Mitteilung aus (auch nachträglich nach Neustart)', async () => {
+    const file = path.join(dir, 'timer-expire.json');
+    const sent: string[] = [];
+    let now = 5_000_000;
+    const t1 = new TimerManager(file, async (title) => { sent.push(title); return true; }, () => now);
+    await t1.toggle('break');
+    t1.dispose();
+    now += 6 * 60_000; // Helper war aus, Timer ist inzwischen abgelaufen
+    const t2 = new TimerManager(file, async (title) => { sent.push(title); return true; }, () => now);
+    await t2.load();
+    assert.deepEqual(sent, ['Pause vorbei']);
+    assert.equal(t2.get(), null);
+  });
+
+  test('System-Aktionen per ID; Konfigurations-IDs mit sys- sind verboten', async () => {
+    const { token } = await pairDevice();
+    const c = connect();
+    await c.opened;
+    c.ws.send(JSON.stringify({ type: 'auth', token, protocol: PROTOCOL_VERSION }));
+    await c.next('timer');
+    await c.next('permissions');
+    c.ws.send(JSON.stringify({ type: 'run', requestId: 'r-sys', actionId: 'sys-timer-stop' }));
+    const r = await c.next('result');
+    assert.equal(r.ok, true);
+    c.ws.close();
+    const cur = config.get();
+    const bad = { ...cur, emojis: [{ id: 'sys-evil', emoji: '😀' }] };
+    assert.equal((await config.update(bad, cur.revision)).ok, false);
   });
 });

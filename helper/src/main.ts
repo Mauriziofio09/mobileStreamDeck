@@ -1,10 +1,11 @@
+import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { DeviceInfo } from '@copper-deck/shared';
 import { ActionRunner } from './actions/runner';
 import { adminRequest, startAdminServer, type AdminRequest } from './admin';
-import { AppCatalog, defaultSwiftSource, suggestDock } from './apps';
+import { AppCatalog, suggestDock } from './apps';
 import { ConfigStore } from './config-store';
 import { DeviceStore } from './devices';
 import { execFileSafe } from './exec';
@@ -12,7 +13,12 @@ import { readJson } from './fsutil';
 import { initLog, log } from './log';
 import { PairingManager } from './pairing';
 import { resolvePaths } from './paths';
+import { Native, resolveNativeBinary, resolveScript } from './native';
+import { PermissionMonitor } from './permissions';
 import { createServer } from './server';
+import { TimerManager } from './timer';
+import { actionSchema } from '@copper-deck/shared/schema';
+import { access, writeFile } from 'node:fs/promises';
 import { caRootFile, ensureCert, hostInfo, inspectCert } from './tls';
 
 declare const __HELPER_VERSION__: string | undefined;
@@ -41,11 +47,18 @@ async function serve(): Promise<void> {
   const host = await hostInfo(execFileSafe);
   const cert = await ensureCert(execFileSafe, paths, host);
 
-  const catalog = new AppCatalog(execFileSafe, {
-    iconCache: paths.iconCache,
-    binDir: paths.bin,
-    swiftSource: process.env['COPPER_DECK_SWIFT_SRC'] ?? defaultSwiftSource(),
+  const native = new Native(execFileSafe, resolveNativeBinary());
+  const context = process.env['COPPER_DECK_CONTEXT'] === 'app' ? 'app' : 'terminal';
+  if (!native.available) log('warn', 'Copper Deck Helper.app nicht gefunden – native Aktionen nicht verfügbar');
+  if (context === 'terminal') log('warn', 'Von Hand gestartet: macOS-Berechtigungen gelten fürs Terminal, nicht für den LaunchAgent');
+  const catalog = new AppCatalog(execFileSafe, { iconCache: paths.iconCache, nativeBinary: native.binary });
+  const permissions = new PermissionMonitor(native, context);
+  const timers = new TimerManager(path.join(paths.data, 'timer.json'), async (title, body) => {
+    const r = await native.call(['notify', title, body], 15_000);
+    if (!r.ok) permissions.report('notifications');
+    return r.ok;
   });
+  await timers.load();
   const devices = new DeviceStore(paths.devices);
   await devices.load();
   const config = new ConfigStore(paths.config, paths.configBackup);
@@ -54,12 +67,14 @@ async function serve(): Promise<void> {
   );
   const pairing = new PairingManager();
   const origins = [`https://${host.mdnsName}:${settings.port}`, `https://localhost:${settings.port}`];
-  const webRoot = process.env['COPPER_DECK_WEB'] ?? path.resolve(here, '../../web/dist/web/browser');
+  const webRoot = process.env['COPPER_DECK_WEB']
+    ?? [path.resolve(here, '../web'), path.resolve(here, '../../web/dist/web/browser')].find((p) => existsSync(path.join(p, 'index.html')))
+    ?? path.resolve(here, '../../web/dist/web/browser');
 
   const readTls = async () => ({ key: await readFile(paths.key), cert: await readFile(paths.cert) });
+  const runner = new ActionRunner({ exec: execFileSafe, native, timers, permissions, keystrokeScript: resolveScript('keystroke'), activateScript: resolveScript('activate') });
   const srv = createServer({
-    devices, pairing, config, catalog,
-    runner: new ActionRunner(execFileSafe),
+    devices, pairing, config, catalog, runner, timers, permissions,
     origins, webRoot, tls: await readTls(), version: VERSION,
   });
 
@@ -76,6 +91,19 @@ async function serve(): Promise<void> {
         return { revoked: await srv.revokeDevice(req.id) };
       case 'status':
         return { version: VERSION, url: origins[0], pid: process.pid, devices: devices.list().length, certValidTo: cert.validTo };
+      case 'permissions':
+        return permissions.check();
+      case 'notifyTest': {
+        const r = await native.call(['notify', 'Copper Deck', 'Testmitteilung – Mitteilungen funktionieren.'], 15_000);
+        if (!r.ok) permissions.report('notifications');
+        return r;
+      }
+      case 'runAction': {
+        // Für Tests unter launchd: führt eine streng typisierte Aktion aus (nur lokal, Socket mit Rechten 600).
+        const a = actionSchema.safeParse(req.action);
+        if (!a.success) throw new Error('Ungültige Aktion');
+        return runner.run(a.data);
+      }
       case 'reloadTls':
         srv.server.setSecureContext(await readTls());
         log('info', 'TLS-Zertifikat neu geladen');
@@ -87,7 +115,19 @@ async function serve(): Promise<void> {
     srv.server.once('error', reject);
     srv.server.listen(settings.port, '0.0.0.0', () => resolve());
   });
-  log('info', `Copper Deck ${VERSION} läuft: ${origins[0]}`, { ips: host.lanIps, webRoot });
+  log('info', `Copper Deck ${VERSION} läuft: ${origins[0]}`, { ips: host.lanIps, webRoot, context, native: native.binary });
+
+  // Berechtigungen: Systemdialoge nur beim ersten Start im App-Kontext zeigen, danach still prüfen.
+  if (native.available) {
+    const marker = path.join(paths.data, 'permissions-prompted');
+    const prompted = await access(marker).then(() => true, () => false);
+    if (context === 'app' && !prompted) {
+      await writeFile(marker, new Date().toISOString(), { mode: 0o600 });
+      void permissions.start(true);
+    } else {
+      void permissions.start(false);
+    }
+  }
 
   const shutdown = (sig: string) => {
     log('info', `Beende (${sig})`);
@@ -135,6 +175,16 @@ async function cli(cmd: string, args: string[]): Promise<void> {
       process.stdout.write(r.revoked ? `Widerrufen: ${id}\n` : `Unbekannte Geräte-ID: ${id}\n`);
       return;
     }
+    case 'notify-test': {
+      const r = (await call({ cmd: 'notifyTest' })) as { ok: boolean; status?: string };
+      process.stdout.write(r.ok ? 'Testmitteilung gesendet.\n' : `Mitteilung nicht möglich (${r.status ?? 'Fehler'}). Systemeinstellungen → Mitteilungen → „Copper Deck Helper“.\n`);
+      return;
+    }
+    case 'permissions': {
+      const r = await call({ cmd: 'permissions' });
+      process.stdout.write(JSON.stringify(r, null, 2) + '\n');
+      return;
+    }
     case 'status': {
       const r = await call({ cmd: 'status' });
       process.stdout.write(JSON.stringify(r, null, 2) + '\n');
@@ -168,7 +218,9 @@ async function cli(cmd: string, args: string[]): Promise<void> {
           '  copper-deck revoke <id>      Gerät widerrufen\n' +
           '  copper-deck cert [--renew]   TLS-Zertifikat prüfen/erneuern\n' +
           '  copper-deck ca               mkcert-Root-CA im Finder zeigen\n' +
-          '  copper-deck status           Status des laufenden Helpers\n',
+          '  copper-deck status           Status des laufenden Helpers\n' +
+          '  copper-deck permissions      macOS-Berechtigungen prüfen\n' +
+          '  copper-deck notify-test      Testmitteilung senden\n',
       );
   }
 }

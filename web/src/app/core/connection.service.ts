@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import {
   CLOSE, PROTOCOL_VERSION, WS_PATH,
-  type ClientMessage, type DeckConfig, type InstalledApp, type ServerMessage,
+  type ClientMessage, type DeckConfig, type InstalledApp, type PermissionKind, type PermissionState, type ServerMessage, type TimerState,
 } from '@copper-deck/shared';
 import { AuthService } from './auth.service';
 
@@ -9,7 +9,7 @@ export type ConnState = 'unpaired' | 'connecting' | 'online' | 'offline';
 
 export type RunOutcome =
   | { readonly ok: true; readonly message?: string }
-  | { readonly ok: false; readonly kind: 'offline' | 'timeout' | 'error' | 'interrupted'; readonly reason: string };
+  | { readonly ok: false; readonly kind: 'offline' | 'timeout' | 'error' | 'interrupted'; readonly reason: string; readonly permission?: PermissionKind };
 
 const BACKOFF_MS = [500, 1000, 2000, 4000, 8000, 15000];
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -39,6 +39,10 @@ export class ConnectionService {
   readonly helperVersion = signal<string>('');
   readonly lastError = signal<string | null>(null);
   readonly attempt = signal(0);
+  readonly timer = signal<TimerState | null>(null);
+  /** Serverzeit minus lokale Zeit: alle Geräte zeigen denselben Countdown. */
+  readonly clockOffset = signal(0);
+  readonly permissions = signal<PermissionState | null>(null);
   readonly online = computed(() => this.state() === 'online');
 
   private ws: WebSocket | null = null;
@@ -128,6 +132,13 @@ export class ConnectionService {
       case 'apps':
         this.apps.set(msg.apps);
         return;
+      case 'timer':
+        this.clockOffset.set(msg.serverNow - Date.now());
+        this.timer.set(msg.timer);
+        return;
+      case 'permissions':
+        this.permissions.set(msg.permissions);
+        return;
       case 'pong':
         if (this.pongTimer) clearTimeout(this.pongTimer);
         this.pongTimer = null;
@@ -137,7 +148,9 @@ export class ConnectionService {
         if (!p) return; // Timeout bereits gemeldet
         clearTimeout(p.timer);
         this.pending.delete(msg.requestId);
-        p.resolve(msg.ok ? { ok: true, ...(msg.message ? { message: msg.message } : {}) } : { ok: false, kind: 'error', reason: msg.message });
+        p.resolve(msg.ok
+          ? { ok: true, ...(msg.message ? { message: msg.message } : {}) }
+          : { ok: false, kind: 'error', reason: msg.message, ...(msg.permission ? { permission: msg.permission } : {}) });
         return;
       }
     }

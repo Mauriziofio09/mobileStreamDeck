@@ -11,6 +11,7 @@ export class ExecError extends Error {
     readonly code: number | string | null,
     readonly stderr: string,
     readonly timedOut: boolean,
+    readonly stdout: string = '',
   ) {
     super(message);
   }
@@ -28,7 +29,7 @@ export const execFileSafe: Exec = (file, args, opts = {}) =>
       (err, stdout, stderr) => {
         if (err) {
           const e = err as NodeJS.ErrnoException & { killed?: boolean; code?: number | string };
-          reject(new ExecError(err.message, e.code ?? null, String(stderr), !!e.killed));
+          reject(new ExecError(err.message, e.code ?? null, String(stderr), !!e.killed, String(stdout)));
           return;
         }
         resolve({ stdout: String(stdout), stderr: String(stderr) });

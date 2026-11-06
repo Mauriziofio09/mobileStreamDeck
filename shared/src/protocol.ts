@@ -29,7 +29,7 @@ export type ErrorCode =
   | 'busy';
 
 export type ActionResultMessage =
-  | { readonly type: 'result'; readonly requestId: string; readonly ok: true; readonly message?: string }
+  | { readonly type: 'result'; readonly requestId: string; readonly ok: true; readonly message?: string; readonly details?: readonly string[] }
   | {
       readonly type: 'result';
       readonly requestId: string;
@@ -37,7 +37,40 @@ export type ActionResultMessage =
       readonly code: ErrorCode;
       /** Verständlicher Grund auf Deutsch. */
       readonly message: string;
+      readonly permission?: PermissionKind;
     };
+
+export type PermissionStatus = 'granted' | 'missing' | 'notDetermined' | 'unknown';
+export type PermissionKind = 'accessibility' | 'automation' | 'notifications';
+
+export interface PermissionState {
+  readonly accessibility: PermissionStatus;
+  readonly automation: PermissionStatus;
+  readonly notifications: PermissionStatus;
+  /** "app" = unter launchd im App-Bundle, "terminal" = von Hand gestartet (Rechte gelten dann fürs Terminal). */
+  readonly context: 'app' | 'terminal';
+  readonly checkedAt: string;
+}
+
+export interface TimerState {
+  readonly preset: 'pomodoro' | 'break';
+  readonly startedAt: number;
+  readonly endsAt: number;
+}
+
+/**
+ * Feste System-Aktionen (nicht konfigurierbar). Konfigurations-IDs dürfen nicht mit "sys-" beginnen.
+ */
+export const SYSTEM_ACTIONS = [
+  'sys-timer-pomodoro',
+  'sys-timer-break',
+  'sys-timer-stop',
+  'sys-settings-accessibility',
+  'sys-settings-automation',
+  'sys-settings-notifications',
+  'sys-request-permissions',
+] as const;
+export type SystemActionId = (typeof SYSTEM_ACTIONS)[number];
 
 export type ServerMessage =
   | { readonly type: 'ready'; readonly deviceId: string; readonly deviceName: string; readonly protocol: number; readonly helperVersion: string }
@@ -45,7 +78,10 @@ export type ServerMessage =
   /** Installierte Apps, die in der Konfiguration vorkommen (für "nicht verfügbar"). */
   | { readonly type: 'apps'; readonly apps: readonly InstalledApp[] }
   | ActionResultMessage
-  | { readonly type: 'pong'; readonly t: number };
+  | { readonly type: 'pong'; readonly t: number }
+  /** Laufender Timer (Endzeit vom Helper) + Serverzeit zur Uhrkorrektur. */
+  | { readonly type: 'timer'; readonly timer: TimerState | null; readonly serverNow: number }
+  | { readonly type: 'permissions'; readonly permissions: PermissionState };
 
 /** Close-Codes (4000–4999 sind für Anwendungen reserviert). */
 export const CLOSE = {

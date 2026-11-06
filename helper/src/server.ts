@@ -10,12 +10,14 @@ import {
   type ClientMessage, type DeckConfig, type InstalledApp, type ServerMessage,
 } from '@copper-deck/shared';
 import { BUNDLE_ID_PATTERN, clientMessageSchema, pairRequestSchema } from '@copper-deck/shared/schema';
-import { resolveAction, type ActionRunner, type RunResult } from './actions/runner';
+import { isSystemAction, resolveAction, type ActionRunner, type RunResult } from './actions/runner';
 import type { AppCatalog } from './apps';
 import type { ConfigStore } from './config-store';
 import type { DeviceStore } from './devices';
 import { log } from './log';
 import type { PairingManager } from './pairing';
+import type { PermissionMonitor } from './permissions';
+import type { TimerManager } from './timer';
 
 export interface ServerDeps {
   readonly devices: DeviceStore;
@@ -23,6 +25,8 @@ export interface ServerDeps {
   readonly config: ConfigStore;
   readonly catalog: AppCatalog;
   readonly runner: ActionRunner;
+  readonly timers: TimerManager;
+  readonly permissions: PermissionMonitor;
   /** Erlaubte Origins, z. B. https://macbook-pro-von-maurizio.local:7443 */
   readonly origins: readonly string[];
   readonly webRoot: string;
@@ -247,6 +251,8 @@ export function createServer(deps: ServerDeps) {
         deps.devices.touch(device.id);
         send(ws, { type: 'ready', deviceId: device.id, deviceName: device.name, protocol: PROTOCOL_VERSION, helperVersion: deps.version });
         send(ws, { type: 'config', config: deps.config.get() });
+        send(ws, { type: 'timer', timer: deps.timers.get(), serverNow: Date.now() });
+        send(ws, { type: 'permissions', permissions: deps.permissions.get() });
         void sendApps(ws);
         return;
       }
@@ -264,8 +270,9 @@ export function createServer(deps: ServerDeps) {
   }
 
   async function handleRun(ws: WebSocket, session: Session, requestId: string, actionId: string): Promise<void> {
-    const action = resolveAction(deps.config.get(), actionId);
-    if (!action) {
+    const system = isSystemAction(actionId) ? actionId : null;
+    const action = system ? null : resolveAction(deps.config.get(), actionId);
+    if (!system && !action) {
       send(ws, { type: 'result', requestId, ok: false, code: 'unknown_action', message: 'Unbekannte Aktion. Die Konfiguration wurde evtl. geändert.' });
       return;
     }
@@ -278,13 +285,15 @@ export function createServer(deps: ServerDeps) {
     let timer: NodeJS.Timeout | undefined;
     try {
       const result: RunResult = await Promise.race([
-        deps.runner.run(action),
+        system ? deps.runner.runSystem(system) : deps.runner.run(action!),
         new Promise<RunResult>((resolve) => {
           timer = setTimeout(() => resolve({ ok: false, code: 'timeout', message: 'Der Mac hat nicht rechtzeitig geantwortet.' }), timeoutMs);
         }),
       ]);
-      log(result.ok ? 'info' : 'warn', 'Aktion', { deviceId: session.deviceId, actionId, type: action.type, ok: result.ok, code: result.ok ? undefined : result.code });
-      send(ws, result.ok ? { type: 'result', requestId, ok: true, ...(result.message ? { message: result.message } : {}) } : { type: 'result', requestId, ok: false, code: result.code, message: result.message });
+      log(result.ok ? 'info' : 'warn', 'Aktion', { deviceId: session.deviceId, actionId, type: system ?? action!.type, ok: result.ok, code: result.ok ? undefined : result.code });
+      send(ws, result.ok
+        ? { type: 'result', requestId, ok: true, ...(result.message ? { message: result.message } : {}), ...(result.details?.length ? { details: result.details } : {}) }
+        : { type: 'result', requestId, ok: false, code: result.code, message: result.message, ...(result.permission ? { permission: result.permission } : {}) });
     } catch (e) {
       log('error', 'Aktion abgestürzt', { actionId, error: (e as Error).message });
       send(ws, { type: 'result', requestId, ok: false, code: 'exec_failed', message: 'Interner Fehler beim Ausführen.' });
@@ -335,6 +344,12 @@ export function createServer(deps: ServerDeps) {
     }
   });
 
+  const broadcast = (msg: ServerMessage): void => {
+    for (const [ws, s] of sockets) if (s.deviceId) send(ws, msg);
+  };
+  const unsubTimer = deps.timers.onChange((timer) => broadcast({ type: 'timer', timer, serverNow: Date.now() }));
+  const unsubPerm = deps.permissions.onChange((permissions) => broadcast({ type: 'permissions', permissions }));
+
   // Tote Verbindungen erkennen (iOS trennt im Hintergrund oft ohne Close-Frame)
   const heartbeat = setInterval(() => {
     for (const [ws, s] of sockets) {
@@ -355,6 +370,8 @@ export function createServer(deps: ServerDeps) {
     async close(): Promise<void> {
       clearInterval(heartbeat);
       unsubscribe();
+      unsubTimer();
+      unsubPerm();
       for (const ws of sockets.keys()) ws.terminate();
       wss.close();
       const closed = new Promise<void>((r) => server.close(() => r()));

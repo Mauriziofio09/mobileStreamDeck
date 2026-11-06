@@ -1,7 +1,6 @@
-import { access, mkdir, readdir, realpath, stat } from 'node:fs/promises';
+import { access, mkdir, readdir, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { InstalledApp } from '@copper-deck/shared';
 import { BUNDLE_ID_PATTERN } from '@copper-deck/shared/schema';
 import type { Exec } from './exec';
@@ -26,7 +25,7 @@ const exists = (p: string): Promise<boolean> => access(p).then(() => true, () =>
 /**
  * Katalog installierter Apps + Icon-Cache (PNG).
  * Icons: sips aus der .icns; liegt das aktuelle Icon in Assets.car (CFBundleIconName),
- * oder fehlt eine .icns, rendert ein kleines Swift-Tool das Icon über NSWorkspace.
+ * oder fehlt eine .icns, rendert das native Programm (Copper Deck Helper.app) das Icon über NSWorkspace.
  */
 export class AppCatalog {
   private apps = new Map<string, AppEntry>();
@@ -36,7 +35,7 @@ export class AppCatalog {
 
   constructor(
     private readonly exec: Exec,
-    private readonly opts: { iconCache: string; binDir: string; swiftSource: string; dirs?: readonly string[] },
+    private readonly opts: { iconCache: string; nativeBinary: string | null; dirs?: readonly string[] },
   ) {}
 
   async list(): Promise<InstalledApp[]> {
@@ -130,7 +129,8 @@ export class AppCatalog {
       if (icns && (await exists(icns)) && !(iconName && hasCar)) {
         await this.exec('/usr/bin/sips', ['-s', 'format', 'png', '-Z', String(ICON_PX), icns, '--out', file]);
       } else {
-        await this.exec(await this.iconTool(), [app.appPath, file, String(ICON_PX)], { timeoutMs: 20_000 });
+        if (!this.opts.nativeBinary) throw new Error('Copper Deck Helper.app fehlt (NSWorkspace-Fallback)');
+        await this.exec(this.opts.nativeBinary, ['app-icon', app.appPath, file, String(ICON_PX)], { timeoutMs: 20_000 });
       }
       return file;
     } catch (e) {
@@ -139,23 +139,6 @@ export class AppCatalog {
     }
   }
 
-  private toolPath: Promise<string> | null = null;
-  private iconTool(): Promise<string> {
-    this.toolPath ??= (async () => {
-      const bin = path.join(this.opts.binDir, 'app-icon');
-      const src = this.opts.swiftSource;
-      const [b, s] = await Promise.all([stat(bin).catch(() => null), stat(src).catch(() => null)]);
-      if (b && (!s || b.mtimeMs >= s.mtimeMs)) return bin;
-      if (!s) throw new Error('app-icon.swift fehlt');
-      await mkdir(this.opts.binDir, { recursive: true, mode: 0o700 });
-      await this.exec('/usr/bin/xcrun', ['swiftc', '-O', src, '-o', bin], { timeoutMs: 120_000 });
-      return bin;
-    })().catch((e: unknown) => {
-      this.toolPath = null;
-      throw e;
-    });
-    return this.toolPath;
-  }
 }
 
 async function listApps(dir: string, depth = 0): Promise<string[]> {
@@ -193,10 +176,4 @@ export async function suggestDock(exec: Exec, catalog: AppCatalog, max = 12): Pr
     if (app) out.push({ bundleId: app.bundleId, name: app.name });
   }
   return out;
-}
-
-/** Pfad zur Swift-Quelle neben dem Bundle (dist/../native) bzw. im Quellbaum. */
-export function defaultSwiftSource(): string {
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  return path.resolve(here, '../native/app-icon.swift');
 }
