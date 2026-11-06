@@ -14,6 +14,7 @@ import { initLog, log } from './log';
 import { PairingManager } from './pairing';
 import { resolvePaths } from './paths';
 import { Native, resolveNativeBinary, resolveScript } from './native';
+import { MediaStore } from './media';
 import { PermissionMonitor } from './permissions';
 import { createServer } from './server';
 import { TimerManager } from './timer';
@@ -75,6 +76,7 @@ async function serve(): Promise<void> {
   const runner = new ActionRunner({ exec: execFileSafe, native, timers, permissions, keystrokeScript: resolveScript('keystroke'), activateScript: resolveScript('activate') });
   const srv = createServer({
     devices, pairing, config, catalog, runner, timers, permissions,
+    media: new MediaStore(path.join(paths.data, 'media'), execFileSafe),
     origins, webRoot, tls: await readTls(), version: VERSION,
   });
 

@@ -1,0 +1,153 @@
+@if (editor.editing()) {
+  <div class="scrim" data-no-swipe (click)="close()">
+    <div class="sheet" cdSurface="sheet" [cdRadius]="0.06" (click)="$event.stopPropagation()" role="dialog" aria-label="Kachel bearbeiten">
+      @if (!picking()) {
+        <header>
+          <h2>{{ isNew() ? 'Neue Kachel' : 'Kachel bearbeiten' }}</h2>
+          <div class="preview">
+            @if (draft(); as d) { <cd-tile [tile]="d" /> }
+          </div>
+        </header>
+
+        <section>
+          <span class="lbl">Typ</span>
+          <div class="seg">
+            <button type="button" [class.on]="kind() === 'app'" (click)="setKind('app')">App-Kachel</button>
+            <button type="button" [class.on]="kind() === 'action'" (click)="setKind('action')">Aktions-Kachel</button>
+          </div>
+        </section>
+
+        @if (kind() === 'action') {
+          <section>
+            <label class="lbl" for="ed-action">Aktion</label>
+            <select id="ed-action" [value]="actionType()" (change)="setAction(text($event))">
+              @for (a of actions; track a.type) { <option [value]="a.type">{{ a.label }}</option> }
+            </select>
+          </section>
+        }
+
+        @switch (kind() === 'app' ? 'openApp' : actionType()) {
+          @case ('openApp') {
+            <section>
+              <span class="lbl">App</span>
+              <button type="button" class="picker" (click)="openPicker()">
+                @if (bundleId()) {
+                  @if (catalog.iconUrl(bundleId()); as src) { <img [src]="src" alt="" /> }
+                  <span>{{ appName() }}</span>
+                } @else {
+                  <span class="muted">App auswählen …</span>
+                }
+                <span class="chev">›</span>
+              </button>
+            </section>
+          }
+          @case ('openUrl') {
+            <section>
+              <label class="lbl" for="ed-url">Link (http/https)</label>
+              <input id="ed-url" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false"
+                     maxlength="2048" [value]="url()" (input)="url.set(text($event))" />
+            </section>
+          }
+          @case ('hotkey') {
+            <section>
+              <span class="lbl">Tastenkombination <strong class="combo">{{ hotkeyText() }}</strong></span>
+              <div class="mods">
+                @for (m of modifiers; track m) {
+                  <button type="button" [class.on]="mods().includes(m)" (click)="toggleMod(m)" [attr.aria-pressed]="mods().includes(m)">
+                    <b>{{ modSymbol[m] }}</b> {{ modName[m] }}
+                  </button>
+                }
+              </div>
+              <select aria-label="Taste" [value]="key()" (change)="key.set($any(text($event)))">
+                @for (k of keys; track k) { <option [value]="k">{{ keyLabel(k) }}</option> }
+              </select>
+              <p class="hint">Buchstaben folgen dem Tastaturlayout des Macs (z. B. Schweizerdeutsch).</p>
+            </section>
+          }
+          @case ('insertEmoji') {
+            <section>
+              <label class="lbl" for="ed-emoji">Emoji, das eingefügt wird</label>
+              <input id="ed-emoji" class="emoji-in" maxlength="16" [value]="actionEmoji()" (input)="actionEmoji.set(text($event))" />
+            </section>
+          }
+          @case ('timer') {
+            <section>
+              <span class="lbl">Timer</span>
+              <div class="seg">
+                <button type="button" [class.on]="preset() === 'pomodoro'" (click)="preset.set('pomodoro')">Pomodoro 25 Min.</button>
+                <button type="button" [class.on]="preset() === 'break'" (click)="preset.set('break')">Pause 5 Min.</button>
+              </div>
+            </section>
+          }
+        }
+
+        <section>
+          <label class="lbl" for="ed-label">Beschriftung</label>
+          <input id="ed-label" maxlength="40" [value]="label()" (input)="label.set(text($event))" />
+        </section>
+
+        @if (kind() === 'action') {
+          <section>
+            <span class="lbl">Farbe</span>
+            <div class="seg">
+              <button type="button" class="c-brown" [class.on]="color() === 'brown'" (click)="color.set('brown')">Braun</button>
+              <button type="button" class="c-violet" [class.on]="color() === 'violet'" (click)="color.set('violet')">Violett</button>
+            </div>
+          </section>
+
+          <section>
+            <span class="lbl">Symbol oben rechts</span>
+            <div class="seg four">
+              <button type="button" [class.on]="iconType() === 'emoji'" (click)="iconType.set('emoji')">Emoji</button>
+              <button type="button" [class.on]="iconType() === 'image'" (click)="iconType.set('image')">Bild</button>
+              @if (actionType() === 'openApp') {
+                <button type="button" [class.on]="iconType() === 'appIcon'" (click)="iconType.set('appIcon')">App-Icon</button>
+              }
+              <button type="button" [class.on]="iconType() === 'none'" (click)="iconType.set('none')">Keins</button>
+            </div>
+            @if (iconType() === 'emoji') {
+              <input class="emoji-in" aria-label="Symbol-Emoji" maxlength="16" [value]="iconEmoji()" (input)="iconEmoji.set(text($event))" />
+            }
+            @if (iconType() === 'image') {
+              <label class="upload">
+                <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onFile($event)" />
+                {{ uploading() ? 'Lade hoch …' : iconFile() ? 'Anderes Bild wählen …' : 'Bild wählen … (PNG, JPEG, WebP, max. 2 MB)' }}
+              </label>
+              @if (uploadError(); as err) { <p class="error">{{ err }}</p> }
+            }
+          </section>
+        }
+
+        @if (errors().length) {
+          <ul class="errors">@for (e of errors(); track e) { <li>{{ e }}</li> }</ul>
+        }
+
+        <footer>
+          @if (!isNew()) { <button type="button" class="danger" (click)="remove()">Entfernen</button> }
+          <span class="grow"></span>
+          <button type="button" class="ghost" (click)="close()">Abbrechen</button>
+          <button type="button" class="primary" cdSurface="tile-brown" [cdRadius]="0.3" [disabled]="errors().length > 0" (click)="save()">Sichern</button>
+        </footer>
+      } @else {
+        <header class="pick-head">
+          <button type="button" class="ghost" (click)="picking.set(false)">‹ Zurück</button>
+          <h2>App auswählen</h2>
+        </header>
+        <input class="search" type="search" placeholder="Suchen" autocapitalize="off" autocorrect="off" [value]="query()" (input)="query.set(text($event))" />
+        @if (appsError(); as err) { <p class="error">{{ err }}</p> }
+        @if (!apps() && !appsError()) { <p class="muted">Lade installierte Apps …</p> }
+        <ul class="apps">
+          @for (a of filteredApps(); track a.bundleId) {
+            <li>
+              <button type="button" [class.on]="a.bundleId === bundleId()" (click)="pick(a)">
+                @if (catalog.iconUrl(a.bundleId); as src) { <img [src]="src" alt="" loading="lazy" /> } @else { <span class="noicon"></span> }
+                <span class="name">{{ a.name }}</span>
+                <span class="bid">{{ a.bundleId }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </div>
+}

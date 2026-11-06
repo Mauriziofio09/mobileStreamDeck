@@ -28,9 +28,12 @@
 }
 
 @if (store.editMode()) {
-  <button type="button" class="done" data-no-swipe cdSurface="segment" [cdRadius]="0.5" (click)="store.editMode.set(false)">
-    Fertig
-  </button>
+  <div class="edit-bar" data-no-swipe>
+    <button type="button" class="edit-btn" cdSurface="segment" [cdRadius]="0.5" (click)="editor.addGroup()">+ Gruppe</button>
+    <button type="button" class="edit-btn" cdSurface="segment" [cdRadius]="0.5" (click)="store.editMode.set(false)">
+      Fertig@if (editor.saving() > 0) { <span class="saving"> …</span> }
+    </button>
+  </div>
 }
 
 @if (store.currentToast(); as toast) {
@@ -42,6 +45,7 @@
 }
 
 <cd-sheets />
+<cd-tile-editor />
 
 @switch (view()) {
   @case ('pairing') { <cd-pairing /> }

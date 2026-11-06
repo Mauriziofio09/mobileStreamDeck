@@ -17,8 +17,16 @@ const PING_EVERY_MS = 15_000;
 const PONG_TIMEOUT_MS = 4_000;
 const CONFIG_CACHE_KEY = 'copperdeck.config';
 
+export type SaveOutcome =
+  | { readonly ok: true; readonly revision: number }
+  | { readonly ok: false; readonly reason: 'stale' | 'invalid' | 'offline' | 'timeout' | 'interrupted'; readonly message: string };
+
 interface Pending {
   resolve: (r: RunOutcome) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+interface PendingSave {
+  resolve: (r: SaveOutcome) => void;
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -43,6 +51,10 @@ export class ConnectionService {
   /** Serverzeit minus lokale Zeit: alle Geräte zeigen denselben Countdown. */
   readonly clockOffset = signal(0);
   readonly permissions = signal<PermissionState | null>(null);
+  /** Letzte vom Helper bestätigte Revision (Basis für Änderungen). */
+  readonly serverRevision = signal<number>(this.config()?.revision ?? 0);
+  /** Zuletzt vom Helper bestätigte Konfiguration (zum Zurücksetzen bei Ablehnung). */
+  private confirmed: DeckConfig | null = this.config();
   readonly online = computed(() => this.state() === 'online');
 
   private ws: WebSocket | null = null;
@@ -50,6 +62,7 @@ export class ConnectionService {
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private pongTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly pending = new Map<string, Pending>();
+  private readonly pendingSaves = new Map<string, PendingSave>();
 
   constructor() {
     document.addEventListener('visibilitychange', () => {
@@ -102,6 +115,35 @@ export class ConnectionService {
     });
   }
 
+  /**
+   * Konfiguration speichern. Die Änderung wird sofort lokal angezeigt (optimistisch);
+   * lehnt der Helper ab, gilt wieder sein Stand.
+   */
+  saveConfig(next: DeckConfig, baseRevision: number): Promise<SaveOutcome> {
+    if (this.state() !== 'online' || !this.ws) {
+      return Promise.resolve({ ok: false, reason: 'offline', message: 'Keine Verbindung zum Mac – Änderung nicht gespeichert.' });
+    }
+    const requestId = crypto.randomUUID();
+    return new Promise<SaveOutcome>((resolve) => {
+      const timer = setTimeout(() => {
+        this.pendingSaves.delete(requestId);
+        resolve({ ok: false, reason: 'timeout', message: 'Keine Antwort vom Mac – Änderung evtl. nicht gespeichert.' });
+      }, REQUEST_TIMEOUT_MS);
+      this.pendingSaves.set(requestId, { resolve, timer });
+      this.sendRaw({ type: 'saveConfig', requestId, baseRevision, config: next });
+    });
+  }
+
+  /** Lokale Vorschau einer Änderung (bis zur Bestätigung durch den Helper). */
+  showOptimistic(next: DeckConfig): void {
+    this.config.set(next);
+  }
+
+  /** Auf den zuletzt bestätigten Stand zurück. */
+  revertToConfirmed(): void {
+    if (this.confirmed) this.config.set(this.confirmed);
+  }
+
   /** App kommt in den Vordergrund: offline -> sofort verbinden, online -> Verbindung prüfen. */
   private wake(): void {
     if (!this.auth.token()) return;
@@ -126,9 +168,20 @@ export class ConnectionService {
         this.startHeartbeat();
         return;
       case 'config':
+        this.confirmed = msg.config;
+        this.serverRevision.set(msg.config.revision);
         this.config.set(msg.config);
         writeCachedConfig(msg.config);
         return;
+      case 'saveResult': {
+        const p = this.pendingSaves.get(msg.requestId);
+        if (!p) return;
+        clearTimeout(p.timer);
+        this.pendingSaves.delete(msg.requestId);
+        if (msg.ok) this.serverRevision.update((r) => Math.max(r, msg.revision));
+        p.resolve(msg.ok ? { ok: true, revision: msg.revision } : { ok: false, reason: msg.reason, message: msg.message });
+        return;
+      }
       case 'apps':
         this.apps.set(msg.apps);
         return;
@@ -216,6 +269,11 @@ export class ConnectionService {
   }
 
   private failPending(): void {
+    for (const [id, p] of this.pendingSaves) {
+      clearTimeout(p.timer);
+      p.resolve({ ok: false, reason: 'interrupted', message: 'Verbindung unterbrochen – Änderung evtl. nicht gespeichert.' });
+      this.pendingSaves.delete(id);
+    }
     for (const [id, p] of this.pending) {
       clearTimeout(p.timer);
       p.resolve({ ok: false, kind: 'interrupted', reason: 'Verbindung unterbrochen – Ergebnis unbekannt.' });

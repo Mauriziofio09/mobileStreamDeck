@@ -49,6 +49,20 @@ export class AppCatalogService {
     });
   }
 
+  /** Icon-URL für die App-Auswahl (lädt bei Bedarf nach). */
+  iconUrl(bundleId: string): string | null {
+    const u = this.icons().get(bundleId);
+    if (!u) void this.loadIcon(bundleId);
+    return u ?? null;
+  }
+
+  /** Alle installierten Apps (für die App-Auswahl im Editor). */
+  async listInstalled(): Promise<{ bundleId: string; name: string }[]> {
+    const res = await fetch('/api/apps', { headers: this.auth.authHeader() });
+    if (!res.ok) throw new Error(String(res.status));
+    return (await res.json()) as { bundleId: string; name: string }[];
+  }
+
   /** `undefined` = unbekannt (noch keine Antwort vom Helper), `null` = nicht installiert. */
   lookup(bundleId: string): CatalogEntry | null | undefined {
     const installed = this.installed();

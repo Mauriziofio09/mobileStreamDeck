@@ -1,6 +1,6 @@
 # Copper Deck
 
-iPhone und iPad als Touch-Panel für den Mac. Die vollständige Anleitung mit Fehlerbehebung folgt in Meilenstein 5. Hier steht der Stand von Meilenstein 3.
+iPhone und iPad als Touch-Panel für den Mac. Die vollständige Anleitung mit Fehlerbehebung folgt in Meilenstein 5. Hier steht der Stand von Meilenstein 4.
 
 ## Installation (LaunchAgent)
 
@@ -36,6 +36,20 @@ Alle Berechtigungen gelten für **„Copper Deck Helper“**, nicht für Termina
 
 Die App zeigt den Stand unter **About → Berechtigungen am Mac**. Mit **Am Mac öffnen** öffnet sich die passende Einstellung direkt auf dem Mac. Erteilst du eine Berechtigung, erkennt die App das nach wenigen Sekunden von selbst. Im Terminal: `copper-deck permissions`, Mitteilungen testen mit `copper-deck notify-test`.
 
+## Kacheln bearbeiten
+
+- **Langes Drücken** (0,5 s) auf eine Kachel startet den Bearbeitungsmodus. Die Kacheln wackeln.
+- **Ziehen:** Ziehst du eine Kachel auf eine andere, tauschen beide den Platz. Auf einem leeren Platz wird sie dorthin verschoben. Das geht auch in andere Gruppen. Hältst du die Kachel am linken oder rechten Bildschirmrand, blättert die App zur nächsten Seite.
+- **Antippen** öffnet den Editor. Dort stellst du Typ (App- oder Aktions-Kachel), Aktion, Beschriftung, Farbe (Braun/Violett) und das Symbol ein (Emoji, eigenes Bild, App-Icon oder keines).
+  - Aktionen: App öffnen, Link öffnen (nur http/https), Tastenkombination (Modifier + Taste), Emoji einfügen, Timer, Fenster anordnen, Stage Manager.
+  - Es gibt **keinen** Aktionstyp für Befehle oder Skripte.
+- **Leeren Platz antippen:** neue Kachel anlegen. **„–“** zweimal antippen: Kachel entfernen.
+- **„+ Gruppe“** hängt eine leere Gruppe hinten an. Eine leere Gruppe lässt sich mit „Gruppe entfernen“ löschen. **„Fertig“** beendet den Bearbeitungsmodus.
+- **App-Auswahl:** Sie zeigt alle Apps aus /Applications, ~/Applications, /System/Applications und /System/Library/CoreServices. Die Icons erzeugt der Helper als PNG (per `sips` aus der .icns, sonst über NSWorkspace) und legt sie im Cache ab.
+- **Eigene Bilder:** PNG, JPEG oder WebP bis 2 MB, kein SVG. Der Helper rechnet sie in ein PNG mit höchstens 512 px um und vergibt den Dateinamen.
+- **Speichern:** Jede Änderung speichert der Helper sofort (atomar, mit Backup der vorigen Version in `config.backup.json`). Alle verbundenen Geräte sehen sie live.
+- **Konflikte:** Haben zwei Geräte fast gleichzeitig etwas geändert, lehnt der Helper die veraltete Änderung ab. Das Gerät meldet das und lädt den aktuellen Stand.
+
 ## Helper von Hand starten (nur Entwicklung)
 
 ```bash
@@ -55,6 +69,7 @@ Danach ist die App erreichbar unter **https://macbook-pro-von-maurizio.local:744
 Tests:
 - `npm test`: Sicherheits-, Protokoll-, Aktions- und Timer-Tests.
 - `node tools/e2e-m3.mjs basic`: Durchlauf gegen den Helper unter launchd.
+- `node tools/e2e-m4.mjs`: zwei Geräte gleichzeitig (iPad und iPhone). Prüft Bearbeiten, Ziehen, Editor, Bild-Upload, App-Auswahl, Live-Sync und Konflikt; setzt die Konfiguration danach zurück.
 - `node tools/e2e-m3-perms.mjs`: Durchlauf mit Berechtigungen. Öffnet TextEdit, tippt mit Schweizer Layout, prüft die Zwischenablage mit Bild und Datei, ordnet Fenster an. Deine Zwischenablage wird vorher gesichert und danach wiederhergestellt.
 
 ## 1. mkcert-Root-CA auf iPhone und iPad installieren
@@ -128,6 +143,7 @@ sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp "$NODE_BIN"
 |---|---|
 | Konfiguration (+ Backup), Geräte, TLS, Icon-Cache | `~/Library/Application Support/CopperDeck/` |
 | Log (ohne Tokens und Codes) | `~/Library/Logs/CopperDeck/helper.log` (+ `launchd.out.log`/`launchd.err.log`) |
+| Eigene Bilder | `~/Library/Application Support/CopperDeck/media/` |
 | Laufender Timer (Endzeit) | `~/Library/Application Support/CopperDeck/timer.json` |
 | App-Bundle | `~/Applications/Copper Deck Helper.app` |
 | LaunchAgent | `~/Library/LaunchAgents/ch.copperdeck.helper.plist` |

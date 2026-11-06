@@ -11,12 +11,14 @@ import { SheetsComponent } from './ui/sheets.component';
 import { OfflineComponent } from './ui/offline.component';
 import { PairingComponent } from './ui/pairing.component';
 import { SideControlsComponent } from './ui/side-controls.component';
+import { TileEditorComponent } from './ui/tile-editor.component';
+import { EditorService } from './core/editor.service';
 
 @Component({
   selector: 'app-root',
   imports: [
     PagerComponent, PageDotsComponent, EmojiBarComponent, DockComponent,
-    SideControlsComponent, SheetsComponent, SurfaceDirective, PairingComponent, OfflineComponent,
+    SideControlsComponent, SheetsComponent, SurfaceDirective, PairingComponent, OfflineComponent, TileEditorComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -31,6 +33,7 @@ export class App {
   protected readonly layoutService = inject(LayoutService);
   protected readonly layout = this.layoutService.layout;
   protected readonly conn = inject(ConnectionService);
+  protected readonly editor = inject(EditorService);
 
   /** Kopplung, Offline-Vollbild (noch nie Konfiguration erhalten) oder das Deck. */
   protected readonly view = computed<'pairing' | 'offline' | 'deck'>(() => {
@@ -41,7 +44,7 @@ export class App {
 
   protected readonly hostClass = computed(() => {
     const l = this.layout();
-    return `is-${l.device} is-${l.orientation} bar-${l.barMode}`;
+    return `is-${l.device} is-${l.orientation} bar-${l.barMode}${this.store.editMode() ? ' is-edit' : ''}`;
   });
 
   /** Geometrie als CSS-Variablen; alle Kachelmasse leiten sich von --frame ab. */

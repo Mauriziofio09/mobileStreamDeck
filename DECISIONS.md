@@ -215,3 +215,42 @@ Hier steht, was ich selbst entschieden habe. Neue Einträge kommen jeweils unten
 ### Testvorfall
 - Der erste Lauf von `e2e-m3-perms` hat Tastendrücke gesendet, während die **Claude-App** vorne war, weil TextEdit wegen der kooperativen Aktivierung nicht nach vorne kam. Betroffen waren „🥰zy+ /“, ⌘S und ⌘W.
 - Der Test prüft jetzt vor **jedem** Tastendruck, ob TextEdit vorne ist, und bricht sonst ab. ⌘W sendet er nicht mehr.
+
+## Meilenstein 4 – Bearbeiten, App-Icons, Live-Sync
+
+### Speichern und Konflikte
+- **Speichern** läuft über WebSocket: `saveConfig {requestId, baseRevision, config}`.
+- **Prüfung im Helper:**
+  - `baseRevision` muss der aktuellen Revision entsprechen, sonst lehnt der Helper mit `stale` ab und schickt dem Gerät sofort den aktuellen Stand.
+  - Danach prüft er gegen das zod-Schema, ob alle verwendeten Bilder existieren, und schreibt atomar mit Backup (`config.backup.json`).
+  - Die Revision erhöht er selbst; der Client kann sie nicht setzen.
+- **Verteilung:** Jede akzeptierte Änderung geht als `config` an **alle** angemeldeten Geräte (Live-Sync).
+- **Client:**
+  - Eine Änderung erscheint sofort lokal (optimistisch).
+  - Gespeichert wird in einer **Warteschlange**: jede Änderung erst, wenn die vorige bestätigt ist, und immer auf Basis der zuletzt bestätigten Revision. Schnell aufeinanderfolgende eigene Änderungen kollidieren deshalb nicht miteinander.
+  - Bei `stale` werden wartende Änderungen verworfen, weil sie auf einem überholten Stand beruhen. Bei `invalid` gilt wieder der bestätigte Stand.
+- **Was als Konflikt gilt:** Es gibt kein automatisches Zusammenführen. Ein Konflikt entsteht nur, wenn ein Gerät eine Änderung des anderen noch nicht kennt, und dann gewinnt der Helper-Stand. Kennt das Gerät die fremde Änderung schon, baut seine nächste Änderung darauf auf.
+- **Grenzen:** Die maximale WebSocket-Nachricht beträgt jetzt 256 KB. Das Schema begrenzt Gruppen (64), Emojis (16) und Dock-Einträge (40).
+
+### Bearbeitungsmodus
+- **Verschieben:** Es gibt feste 8 Plätze pro Gruppe. Ziehen auf eine Kachel **tauscht** die beiden, Ziehen auf einen leeren Platz **verschiebt**. Das ist einfacher vorhersagbar als Nachrücken und passt zum Modell mit festen Plätzen.
+- **Ziehen:** Eine Kopie der Kachel (eingehängt in `app-root`, damit die CSS-Variablen gelten) folgt dem Finger, bewegt nur per `transform`. Das Ziel ermittle ich mit `elementFromPoint`.
+- **Rand:** 550 ms am Rand verweilen blättert, danach alle 900 ms eine weitere Seite.
+- **Gesten:** Im Bearbeitungsmodus gehört eine Berührung auf einer Kachel der Kachel (`stopPropagation` + Pointer-Capture). Wischen auf freier Fläche oder leeren Plätzen blättert weiterhin.
+- **Löschen ohne `window.confirm`,** weil Dialoge in einer iOS-PWA blockieren: Das erste Tippen auf „–“ fragt per Hinweis nach, ein zweites Tippen innerhalb von 3 s löscht.
+- **Bearbeiten nur online:** Ohne Verbindung startet langes Drücken den Modus nicht. Bricht die Verbindung während der Bearbeitung ab, meldet die App, dass nicht gespeichert wurde, und zeigt wieder den bestätigten Stand.
+- **Nicht bearbeitbar:** Emoji-Leiste und Dock sind in diesem Meilenstein nicht im Editor. Deine Vorgabe nennt nur Kacheln.
+- **Behobener Fehler aus dem Test:** Das Loslassen nach dem langen Drücken öffnete sofort den Editor dieser Kachel. Jetzt startet es nur den Modus.
+- **iPhone:** Quer liegt die Bearbeitungsleiste klein neben den Seitenpunkten. Hochkant ersetzt sie während der Bearbeitung Uhr und Pille.
+
+### Editor
+- **Typ:** App-Kachel oder Aktions-Kachel.
+- **Aktionen:** feste Liste. App öffnen (über die App-Auswahl), Link öffnen (nur http/https, wird schon im Editor geprüft), Tastenkombination (Schalter für ⌘ ⌥ ⌃ ⇧ plus Tastenliste aus `HOTKEY_KEYS`), Emoji einfügen, Timer, Fenster anordnen, Stage Manager.
+- **Weitere Felder:** Beschriftung (höchstens 40 Zeichen), Farbe Braun/Violett, Symbol (Emoji, eigenes Bild, App-Icon nur bei „App öffnen“, oder keines). Eine Live-Vorschau zeigt die echte Kachel.
+- **App-Auswahl:** `GET /api/apps` liefert alle Apps aus den vier Ordnern (auf deinem Mac 261), mit Suche nach Name oder Bundle-ID. Die Icons laden einzeln nach. Der Helper extrahiert höchstens 4 gleichzeitig, damit 261 Icons nicht 261 Prozesse auf einmal starten.
+
+### Eigene Bilder
+- **Upload:** `POST /api/media` mit Token. Erlaubt sind nur die Content-Types PNG, JPEG und WebP; **zusätzlich** prüfe ich die Magic Bytes, damit ein SVG mit falschem Typ abgelehnt wird. Höchstens 2 MB.
+- **Speichern:** Der Helper vergibt einen Zufallsnamen (`<32 hex>.png`). `sips` rechnet das Bild in ein PNG mit höchstens 512 px um. Das prüft zugleich, dass es sich dekodieren lässt, und entfernt Metadaten. Gespeichert wird unter `media/`.
+- **Abruf:** Nur mit Token. Den Dateinamen prüfe ich streng, damit kein Pfad-Traversal möglich ist.
+- **Aufräumen:** Nicht mehr verwendete Bilder löscht der Helper nach dem Speichern, frische Uploads aber erst nach 15 Minuten, damit ein Upload aus einem noch offenen Editor erhalten bleibt.

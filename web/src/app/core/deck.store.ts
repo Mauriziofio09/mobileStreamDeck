@@ -49,6 +49,8 @@ export class DeckStore {
     else this.overlayOpen.update((v) => !v);
   }
 
+  private readonly _toastListener = window.addEventListener('cd-toast', (e) => this.toast(String((e as CustomEvent).detail), 'info'));
+
   toast(text: string, kind: Toast['kind']): void {
     this.currentToast.set({ id: ++this.toastId, text, kind });
     if (this.toastTimer) clearTimeout(this.toastTimer);

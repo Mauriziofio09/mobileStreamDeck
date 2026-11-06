@@ -147,6 +147,7 @@ body { position: fixed; inset: 0; }
 
 button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 img { -webkit-user-drag: none; }
+input, textarea, select { -webkit-user-select: text; user-select: text; }
 
 /* Squircle-Ebene (siehe SurfaceDirective) */
 .cd-surface { position: relative; isolation: isolate; }
@@ -164,4 +165,15 @@ img { -webkit-user-drag: none; }
   visibility: hidden;
   pointer-events: none;
   padding: var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l);
+}
+
+/* Kopie beim Ziehen (nur transform) */
+.cd-drag-ghost {
+  position: fixed !important;
+  left: 0;
+  top: 0;
+  z-index: 100;
+  pointer-events: none;
+  will-change: transform;
+  opacity: 0.96;
 }

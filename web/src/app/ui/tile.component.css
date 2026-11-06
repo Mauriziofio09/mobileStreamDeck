@@ -163,6 +163,9 @@
   to { transform: rotate(1.6deg); }
 }
 .delete {
+  border: 0;
+  padding: 0;
+  z-index: 3;
   position: absolute;
   top: 0;
   left: 0;
@@ -201,4 +204,16 @@
   color: var(--c-warn);
   background: var(--c-delete);
   box-shadow: 0 0 0 1px var(--c-pill-rim);
+}
+
+:host(.is-drag-source) .frame { opacity: 0.25; }
+:host(.is-drop-target) .frame { transform: scale(1.06); transition: transform 120ms var(--ease-out); }
+:host(.is-drop-target) .tile { box-shadow: 0 0 0 3px var(--c-seg-rim); border-radius: 26%; }
+.plus {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 300 calc(var(--tile) * 0.42) / 1 var(--font-ui);
+  color: var(--c-empty-rim);
 }

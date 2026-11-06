@@ -5,11 +5,14 @@ import type { Duplex } from 'node:stream';
 import path from 'node:path';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { WebSocketServer, type WebSocket } from 'ws';
+import type { z } from 'zod';
 import {
   CLOSE, PROTOCOL_VERSION, WS_PATH,
-  type ClientMessage, type DeckConfig, type InstalledApp, type ServerMessage,
+  type DeckConfig, type InstalledApp, type ServerMessage,
 } from '@copper-deck/shared';
-import { BUNDLE_ID_PATTERN, clientMessageSchema, pairRequestSchema } from '@copper-deck/shared/schema';
+import { BUNDLE_ID_PATTERN, clientMessageSchema, deckConfigSchema, pairRequestSchema } from '@copper-deck/shared/schema';
+import { MEDIA_MAX_BYTES, MEDIA_TYPES } from '@copper-deck/shared';
+import type { MediaStore } from './media';
 import { isSystemAction, resolveAction, type ActionRunner, type RunResult } from './actions/runner';
 import type { AppCatalog } from './apps';
 import type { ConfigStore } from './config-store';
@@ -27,6 +30,7 @@ export interface ServerDeps {
   readonly runner: ActionRunner;
   readonly timers: TimerManager;
   readonly permissions: PermissionMonitor;
+  readonly media: MediaStore;
   /** Erlaubte Origins, z. B. https://macbook-pro-von-maurizio.local:7443 */
   readonly origins: readonly string[];
   readonly webRoot: string;
@@ -164,6 +168,34 @@ export function createServer(deps: ServerDeps) {
     res.type('png').sendFile(file);
   });
 
+  // Eigene Bilder: nur PNG/JPEG/WebP, Grössenlimit, Dateiname vom Helper.
+  api.post('/media', express.raw({ type: () => true, limit: MEDIA_MAX_BYTES }), async (req, res) => {
+    const type = String(req.headers['content-type'] ?? '').split(';')[0]!.trim().toLowerCase();
+    if (!(MEDIA_TYPES as readonly string[]).includes(type)) {
+      res.status(415).json({ error: 'Nur PNG, JPEG oder WebP (kein SVG).' });
+      return;
+    }
+    const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    const r = await deps.media.save(body);
+    if (!r.ok) {
+      const msg = { too_large: 'Bild ist grösser als 2 MB.', unsupported: 'Nur PNG, JPEG oder WebP (kein SVG).', invalid_image: 'Bild ist beschädigt oder nicht lesbar.' }[r.error];
+      res.status(r.error === 'too_large' ? 413 : 415).json({ error: msg });
+      return;
+    }
+    log('info', 'Bild gespeichert', { deviceId: res.locals['deviceId'], file: r.file });
+    res.status(201).json({ file: r.file });
+  });
+
+  api.get('/media/:file', async (req, res) => {
+    const p = await deps.media.resolve(String(req.params['file'] ?? ''));
+    if (!p) {
+      res.status(404).end();
+      return;
+    }
+    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    res.type('png').sendFile(p);
+  });
+
   api.use((_req, res) => {
     res.status(404).json({ error: 'Unbekannter Endpunkt' });
   });
@@ -196,15 +228,19 @@ export function createServer(deps: ServerDeps) {
     });
   }
 
-  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: Error & { status?: number; type?: string }, _req: Request, res: Response, _next: NextFunction) => {
+    if (err.type === 'entity.too.large') {
+      if (!res.headersSent) res.status(413).json({ error: 'Bild ist grösser als 2 MB.' });
+      return;
+    }
     log('error', 'HTTP-Fehler', { error: err.message });
-    if (!res.headersSent) res.status(500).json({ error: 'Interner Fehler' });
+    if (!res.headersSent) res.status(err.status && err.status < 500 ? err.status : 500).json({ error: 'Anfrage ungültig' });
   });
 
   const server = https.createServer({ key: deps.tls.key, cert: deps.tls.cert, minVersion: 'TLSv1.2' }, app);
 
   // ---------- WebSocket ----------
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
 
   server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
     const url = new URL(req.url ?? '/', 'https://x');
@@ -229,7 +265,7 @@ export function createServer(deps: ServerDeps) {
     ws.on('error', () => undefined);
     ws.on('message', (data, isBinary) => {
       if (isBinary) return ws.close(CLOSE.invalidMessage, 'binary');
-      let parsed: ClientMessage;
+      let parsed: z.infer<typeof clientMessageSchema>;
       try {
         const res = clientMessageSchema.safeParse(JSON.parse(String(data)));
         if (!res.success) throw new Error('schema');
@@ -262,6 +298,9 @@ export function createServer(deps: ServerDeps) {
           return;
         case 'run':
           void handleRun(ws, session, parsed.requestId, parsed.actionId);
+          return;
+        case 'saveConfig':
+          void handleSave(ws, session, parsed.requestId, parsed.baseRevision, parsed.config);
           return;
         case 'auth':
           return; // bereits angemeldet
@@ -301,6 +340,33 @@ export function createServer(deps: ServerDeps) {
       clearTimeout(timer);
       session.inflight -= 1;
     }
+  }
+
+  /** Konfigurationsänderung: Revision + Schema + Bilder prüfen, atomar speichern, an alle senden. */
+  async function handleSave(ws: WebSocket, session: Session, requestId: string, baseRevision: number, next: unknown): Promise<void> {
+    const parsed = deckConfigSchema.safeParse({ ...(next as object), revision: deps.config.get().revision });
+    if (parsed.success) {
+      const missing = await deps.media.missing(parsed.data as DeckConfig);
+      if (missing.length) {
+        send(ws, { type: 'saveResult', requestId, ok: false, reason: 'invalid', message: 'Ein Bild fehlt auf dem Mac. Bitte erneut hochladen.', issues: missing });
+        return;
+      }
+    }
+    const r = await deps.config.update(next, baseRevision);
+    if (r.ok) {
+      log('info', 'Konfiguration geändert', { deviceId: session.deviceId, revision: r.config.revision });
+      send(ws, { type: 'saveResult', requestId, ok: true, revision: r.config.revision });
+      void deps.media.gc(r.config).catch(() => undefined);
+      return;
+    }
+    if (r.reason === 'stale') {
+      log('warn', 'Veraltete Änderung abgelehnt', { deviceId: session.deviceId, baseRevision, current: r.current.revision });
+      send(ws, { type: 'saveResult', requestId, ok: false, reason: 'stale', message: 'Ein anderes Gerät hat inzwischen etwas geändert. Der aktuelle Stand wurde geladen.' });
+      send(ws, { type: 'config', config: r.current });
+      return;
+    }
+    log('warn', 'Ungültige Konfiguration abgelehnt', { deviceId: session.deviceId, issues: r.issues.slice(0, 5) });
+    send(ws, { type: 'saveResult', requestId, ok: false, reason: 'invalid', message: 'Die Änderung ist ungültig und wurde nicht gespeichert.', issues: r.issues.slice(0, 10) });
   }
 
   async function sendApps(ws: WebSocket): Promise<void> {

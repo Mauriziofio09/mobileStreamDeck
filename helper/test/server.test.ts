@@ -17,6 +17,8 @@ import { ExecError, type Exec } from '../src/exec';
 import type { Native, NativeResult } from '../src/native';
 import { PAIR_CODE_TTL_MS, PairingManager } from '../src/pairing';
 import { PermissionMonitor } from '../src/permissions';
+import { MediaStore, sniffImage } from '../src/media';
+import { execFileSafe } from '../src/exec';
 import { TimerManager } from '../src/timer';
 import { createServer } from '../src/server';
 
@@ -85,6 +87,7 @@ before(async () => {
   srv = createServer({
     devices, pairing, config, catalog: catalogStub,
     runner: r.runner, timers: r.timers, permissions: r.permissions,
+    media: new MediaStore(path.join(dir, 'media'), execFileSafe),
     origins: [origin],
     webRoot: path.join(dir, 'no-web'),
     tls: { key: readFileSync(`${dir}/key.pem`), cert: readFileSync(`${dir}/cert.pem`) },
@@ -113,6 +116,19 @@ async function req(method: string, url: string, opts: { body?: unknown; token?: 
     r.on('error', reject);
     if (opts.body !== undefined) r.write(JSON.stringify(opts.body));
     r.end();
+  });
+}
+async function upload(body: Buffer, type: string, token?: string) {
+  return new Promise<{ status: number; json: any }>((resolve, reject) => {
+    const headers: Record<string, string> = { 'content-type': type, origin };
+    if (token) headers['authorization'] = `Bearer ${token}`;
+    const r = https.request(`${base}/api/media`, { method: 'POST', headers, ca: CA }, (res) => {
+      let data = '';
+      res.on('data', (c) => (data += c));
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, json: data ? safeJson(data) : null }));
+    });
+    r.on('error', reject);
+    r.end(body);
   });
 }
 const safeJson = (s: string) => { try { return JSON.parse(s); } catch { return s; } };
@@ -476,5 +492,92 @@ describe('Meilenstein 3: Aktionen', () => {
     const cur = config.get();
     const bad = { ...cur, emojis: [{ id: 'sys-evil', emoji: '😀' }] };
     assert.equal((await config.update(bad, cur.revision)).ok, false);
+  });
+});
+
+describe('Meilenstein 4: Bearbeiten, Live-Sync, Bilder', () => {
+  async function client(token: string) {
+    const c = connect();
+    await c.opened;
+    c.ws.send(JSON.stringify({ type: 'auth', token, protocol: PROTOCOL_VERSION }));
+    await c.next('ready');
+    await c.next('config');
+    return c;
+  }
+
+  test('Änderung wird gespeichert und live an alle Geräte verteilt; veraltete wird abgelehnt', async () => {
+    const a = await client((await pairDevice('iPad')).token);
+    const b = await client((await pairDevice('iPhone')).token);
+    const base = config.get();
+    const g0 = base.groups[0]!;
+    const moved = { ...base, groups: [{ ...g0, tiles: [g0.tiles[1]!, g0.tiles[0]!, ...g0.tiles.slice(2)] }, ...base.groups.slice(1)] };
+
+    // Bisherige config-Nachrichten verwerfen, dann speichern
+    const waitB = new Promise<any>((resolve) => b.ws.on('message', (d) => { const m = JSON.parse(String(d)); if (m.type === 'config' && m.config.revision === base.revision + 1) resolve(m); }));
+    a.ws.send(JSON.stringify({ type: 'saveConfig', requestId: 's1', baseRevision: base.revision, config: moved }));
+    const res = await a.next('saveResult');
+    assert.equal(res.ok, true);
+    assert.equal(res.ok && res.revision, base.revision + 1);
+    const pushed = await waitB;
+    assert.equal(pushed.config.groups[0].tiles[0].id, g0.tiles[1]!.id, 'Gerät B sieht die Änderung live');
+
+    // B ändert auf Basis der alten Revision -> Konflikt
+    const waitConf = new Promise<any>((resolve) => b.ws.on('message', (d) => { const m = JSON.parse(String(d)); if (m.type === 'saveResult') resolve(m); }));
+    b.ws.send(JSON.stringify({ type: 'saveConfig', requestId: 's2', baseRevision: base.revision, config: base }));
+    const conflict = await waitConf;
+    assert.equal(conflict.ok, false);
+    assert.equal(conflict.reason, 'stale');
+    assert.equal(config.get().revision, base.revision + 1, 'veraltete Änderung wurde nicht übernommen');
+    a.ws.close(); b.ws.close();
+  });
+
+  test('ungültige Konfiguration (Shell-Aktion, fremdes Bild, javascript:-Link) wird abgelehnt', async () => {
+    const a = await client((await pairDevice()).token);
+    const cur = config.get();
+    const tile = (action: object, icon: object = { type: 'none' }) => ({ ...cur, groups: [{ id: 'g-x', tiles: [{ id: 't-x', kind: 'action', label: 'X', color: 'brown', icon, action }, null, null, null, null, null, null, null] }] });
+    const cases = [
+      tile({ type: 'shell', command: 'ls' }),
+      tile({ type: 'openUrl', url: 'javascript:alert(1)' }),
+      tile({ type: 'tileWindows' }, { type: 'image', file: '../../etc/passwd' }),
+      tile({ type: 'tileWindows' }, { type: 'image', file: 'a'.repeat(32) + '.png' }), // existiert nicht
+    ];
+    let i = 0;
+    for (const cfg of cases) {
+      a.ws.send(JSON.stringify({ type: 'saveConfig', requestId: `inv${i++}`, baseRevision: cur.revision, config: cfg }));
+      const r = await new Promise<any>((resolve) => a.ws.once('message', (d) => resolve(JSON.parse(String(d)))));
+      assert.equal(r.type, 'saveResult');
+      assert.equal(r.ok, false);
+      assert.equal(r.reason, 'invalid');
+    }
+    assert.equal(config.get().revision, cur.revision);
+    a.ws.close();
+  });
+
+  test('Bilder: nur PNG/JPEG/WebP, kein SVG, Grössenlimit, Name vom Helper, nur mit Token', async () => {
+    const { token } = await pairDevice();
+    const png = execFileSync('/usr/bin/sips', ['-s', 'format', 'png', '-Z', '40', '/System/Library/CoreServices/Finder.app/Contents/Resources/Finder.icns', '--out', `${dir}/t.png`]) && readFileSync(`${dir}/t.png`);
+    assert.equal(sniffImage(png), 'png');
+    assert.equal((await upload(png, 'image/png')).status, 401, 'ohne Token');
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+    assert.equal((await upload(svg, 'image/svg+xml', token)).status, 415);
+    assert.equal((await upload(svg, 'image/png', token)).status, 415, 'SVG mit falschem Content-Type erkannt');
+    assert.equal((await upload(Buffer.concat([png.subarray(0, 16), Buffer.alloc(100)]), 'image/png', token)).status, 415, 'kaputtes PNG');
+    assert.equal((await upload(Buffer.alloc(2 * 1024 * 1024 + 10, 1), 'image/png', token)).status, 413);
+    const ok = await upload(png, 'image/png', token);
+    assert.equal(ok.status, 201);
+    assert.match(ok.json.file, /^[a-f0-9]{32}\.png$/);
+    // Abrufen nur mit Token
+    assert.equal((await req('GET', `/api/media/${ok.json.file}`)).status, 401);
+    assert.equal((await req('GET', `/api/media/${ok.json.file}`, { token })).status, 200);
+    assert.equal((await req('GET', '/api/media/..%2Fdevices.json', { token })).status, 404);
+
+    // Bild in Konfiguration verwenden
+    const a = await client(token);
+    const cur = config.get();
+    const next = { ...cur, groups: [...cur.groups, { id: 'g-img', tiles: [{ id: 't-img', kind: 'action', label: 'Bild', color: 'violet', icon: { type: 'image', file: ok.json.file }, action: { type: 'tileWindows' } }, null, null, null, null, null, null, null] }] };
+    a.ws.send(JSON.stringify({ type: 'saveConfig', requestId: 'img', baseRevision: cur.revision, config: next }));
+    const r = await a.next('saveResult');
+    assert.equal(r.ok, true);
+    a.ws.close();
   });
 });

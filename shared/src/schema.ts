@@ -92,6 +92,8 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('auth'), token: z.string().min(20).max(200), protocol: z.number().int() }).strict(),
   z.object({ type: z.literal('run'), requestId: id, actionId: id }).strict(),
   z.object({ type: z.literal('ping'), t: z.number() }).strict(),
+  // Inhalt wird im Helper gegen deckConfigSchema geprüft (mit verständlichen Fehlermeldungen).
+  z.object({ type: z.literal('saveConfig'), requestId: id, baseRevision: z.number().int().nonnegative(), config: z.unknown() }).strict(),
 ]);
 
 export const pairRequestSchema = z.object({

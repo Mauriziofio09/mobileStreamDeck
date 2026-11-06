@@ -15,7 +15,11 @@ export type ClientMessage =
   /** Erste Nachricht nach dem Verbindungsaufbau; Token nie in der URL. */
   | { readonly type: 'auth'; readonly token: string; readonly protocol: number }
   | { readonly type: 'run'; readonly requestId: string; readonly actionId: string }
-  | { readonly type: 'ping'; readonly t: number };
+  | { readonly type: 'ping'; readonly t: number }
+  /** Konfigurationsänderung; basiert auf baseRevision (sonst Ablehnung als veraltet). */
+  | { readonly type: 'saveConfig'; readonly requestId: string; readonly baseRevision: number; readonly config: DeckConfig };
+
+export type SaveRejectReason = 'stale' | 'invalid';
 
 export type ErrorCode =
   | 'unknown_action'
@@ -81,7 +85,18 @@ export type ServerMessage =
   | { readonly type: 'pong'; readonly t: number }
   /** Laufender Timer (Endzeit vom Helper) + Serverzeit zur Uhrkorrektur. */
   | { readonly type: 'timer'; readonly timer: TimerState | null; readonly serverNow: number }
-  | { readonly type: 'permissions'; readonly permissions: PermissionState };
+  | { readonly type: 'permissions'; readonly permissions: PermissionState }
+  | { readonly type: 'saveResult'; readonly requestId: string; readonly ok: true; readonly revision: number }
+  | { readonly type: 'saveResult'; readonly requestId: string; readonly ok: false; readonly reason: SaveRejectReason; readonly message: string; readonly issues?: readonly string[] };
+
+/** Antwort von POST /api/media */
+export interface MediaUploadResponse {
+  readonly file: string;
+}
+
+/** Grenzen für eigene Bilder. */
+export const MEDIA_MAX_BYTES = 2 * 1024 * 1024;
+export const MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 
 /** Close-Codes (4000–4999 sind für Anwendungen reserviert). */
 export const CLOSE = {

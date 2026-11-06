@@ -114,7 +114,25 @@ export class AppCatalog {
     return job;
   }
 
-  private async extract(bundleId: string, file: string): Promise<string | null> {
+  /** Höchstens 4 Icon-Extraktionen gleichzeitig (App-Auswahl lädt viele Icons auf einmal). */
+  private running = 0;
+  private readonly queue: (() => void)[] = [];
+  private async slot<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.running >= 4) await new Promise<void>((r) => this.queue.push(r));
+    this.running++;
+    try {
+      return await fn();
+    } finally {
+      this.running--;
+      this.queue.shift()?.();
+    }
+  }
+
+  private extract(bundleId: string, file: string): Promise<string | null> {
+    return this.slot(() => this.extractNow(bundleId, file));
+  }
+
+  private async extractNow(bundleId: string, file: string): Promise<string | null> {
     await this.ensureScanned();
     const app = this.apps.get(bundleId);
     if (!app) return null;
