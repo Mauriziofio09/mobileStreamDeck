@@ -382,3 +382,12 @@ Hier steht, was ich selbst entschieden habe. Neue Einträge kommen jeweils unten
 ### Getestet und offen
 - **Getestet:** 7 Unit-Tests (Status lesen, Namensprüfung, stdout aufteilen, Zertifikat holen/speichern/nicht unnötig erneuern, Fehlererklärung, SNI mit zwei Zertifikaten). Unter launchd: Tailscale-Adresse erkannt, Rückfall-Zertifikat mit ts.net-Namen, `https://copperdeck-mac.tailf11a59.ts.net:7443` antwortet.
 - **Offen:** Das echte Zertifikat konnte ich nicht holen. Im KTLU-Netz liest „Swisscom SecurePOP“ verschlüsselte Verbindungen mit, Let's Encrypt ist so nicht prüfbar. Auch der Tailscale-Relay ist von dort nicht erreichbar. Ob iPhone und Mac sich im KTLU-WLAN über Tailscale direkt finden, muss der Test am iPhone zeigen; über den Hotspot oder Mobilfunk sollte es gehen.
+
+## Startseiten auf battle-isle.app
+
+- **Was auf die Domains kommt:** Informationsseiten, nicht die App. Copper Deck muss auf jedem Rechner selbst laufen (nur der lokale Helper kann Apps öffnen und Tasten senden); eine zentral gehostete App könnte keinen Rechner steuern. Die Seiten erklären Installation, iPhone-Einrichtung, Tailscale, Lightroom und Hilfe; der Download kommt vom öffentlichen GitHub-Repo.
+- **Eine Vorlage, zwei Seiten:** `site/src/page.html` mit Mac-/Windows-Blöcken, gebaut von `site/build.mjs`. So bleiben beide Seiten gleich aufgebaut, und Texte passen zum System (Terminal/PowerShell, Mac/PC, AirDrop/Mail).
+- **Statisch und streng:** kein Inline-Skript (nur `app.js` für die Kopieren-Knöpfe), eigene Schriften, keine externen Ressourcen, keine Cookies oder Statistik. CSP in Caddy wie bei photoAI.
+- **Deploy wie photoAI:** gleicher Server, gleicher Caddy, eigener read-only nginx-Container für beide Hostnamen.
+- **DNS:** Beide Namen zeigen bei Cloudflare derzeit auf Cloudflare-Proxys (orange Wolke) und liefern Fehler 525, weil der Server für sie noch kein Zertifikat hat. Wie bei den anderen Seiten gehören sie auf „nur DNS“ (graue Wolke) mit `A → 78.47.125.152`; das kann ich ohne Cloudflare-Zugang nicht ändern.
+- **Geprüft:** beide Seiten in Playwright WebKit bei 1280 px und 390 px; kein horizontales Scrollen, alle Ressourcen laden, Kopieren-Knöpfe da. Nicht geprüft: nginx-Konfiguration (kein Docker auf diesem Mac) und der eigentliche Deploy (SSH-Zugriff auf den Server wurde von der Rechteprüfung abgelehnt).

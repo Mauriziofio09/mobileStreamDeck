@@ -8,3 +8,4 @@ design-ref/
 screenshots/
 # Wird vor jedem Build erzeugt
 web/src/version.ts
+site/dist/

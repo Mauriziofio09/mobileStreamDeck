@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Copper Deck für {{SYSTEM}}</title>
+  <meta name="description" content="Copper Deck macht iPhone und iPad zu einem Touch-Panel für deinen {{HOST}}: Apps, Links, Tastenkombinationen, Emojis, Fenster, Timer und Lightroom Classic." />
+  <meta name="theme-color" content="#2a0f03" />
+  <link rel="icon" href="favicon-64.png" sizes="64x64" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="preload" href="fonts/barlow-condensed-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#start"><img src="icon-192.png" alt="" width="36" height="36" /> Copper Deck</a>
+    <nav>
+      <a href="#installieren">Installieren</a>
+      <a href="#iphone">iPhone</a>
+      <a href="#lightroom">Lightroom</a>
+      <a href="#hilfe">Hilfe</a>
+      <a class="switch" href="{{OTHER_URL}}">{{OTHER_SYSTEM}} →</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" id="start">
+      <div class="hero-text">
+        <p class="eyebrow">Für {{SYSTEM}}<!--win--> · neu<!--/win--></p>
+        <h1>Dein iPhone wird zum Bedienpult für deinen {{HOST}}.</h1>
+        <p class="lead">Ein Tipp auf eine Kachel öffnet eine App oder einen Link, sendet eine Tastenkombination, fügt ein Emoji ein, ordnet Fenster an oder startet einen Timer. Dazu ein eigener Tab für <strong>Lightroom Classic</strong> mit allen wichtigen Reglern.</p>
+        <div class="cta">
+          <a class="btn primary" href="#installieren">Installieren</a>
+          <a class="btn" href="https://github.com/Mauriziofio09/mobileStreamDeck/archive/refs/heads/main.zip">Download (ZIP)</a>
+        </div>
+        <p class="fine">Kostenlos · läuft auf deinem eigenen {{HOST}}, keine Cloud · Quellcode auf <a href="https://github.com/Mauriziofio09/mobileStreamDeck">GitHub</a></p>
+        <!--win-->
+        <p class="notice"><strong>Hinweis:</strong> Die Windows-Version ist neu und wird gerade erprobt. Wenn bei der Installation etwas hängt, die Ausgabe von <code>install.ps1</code> aufbewahren und melden.</p>
+        <!--/win-->
+      </div>
+      <figure class="shot hero-shot">
+        <img src="img/deck-ipad.webp" alt="Copper Deck auf dem iPad: zwei Gruppen mit Kacheln, Emoji-Leiste oben und Dock unten" width="1400" height="973" />
+      </figure>
+    </section>
+
+    <section class="features">
+      <article>
+        <h3>Kacheln nach deinem Geschmack</h3>
+        <p>Langes Drücken startet den Bearbeitungsmodus: Kacheln verschieben, Aktion, Farbe, Symbol oder eigenes Bild wählen. Emoji-Leiste und Dock lassen sich genauso anpassen.</p>
+      </article>
+      <article>
+        <h3>Deine Apps</h3>
+        <!--mac--><p>Die App-Auswahl zeigt alle Apps aus /Applications mit ihren echten Icons.</p><!--/mac-->
+        <!--win--><p>Die App-Auswahl zeigt alle Programme aus dem Startmenü, auch Store-Apps, mit Icons. Fehlt eines: <code>copper-deck add-app "C:\…\Programm.exe"</code>.</p><!--/win-->
+      </article>
+      <article>
+        <h3>Live auf allen Geräten</h3>
+        <p>iPhone und iPad zeigen jede Änderung sofort. Ein Timer läuft auf allen Geräten gleich und meldet sich am Ende am {{HOST}}.</p>
+      </article>
+      <article>
+        <h3>Sicher</h3>
+        <p>Nur gekoppelte Geräte, feste Aktionsliste, keine Befehle oder Skripte. Die Verbindung ist verschlüsselt und bleibt in deinem Netz oder deinem Tailscale.</p>
+      </article>
+    </section>
+
+    <section id="installieren">
+      <h2>Installieren</h2>
+      <p class="sub">Einmalig am {{HOST}}, dauert etwa 10 Minuten.</p>
+      <!--mac-->
+      <ol class="steps">
+        <li>
+          <h4>Werkzeuge installieren</h4>
+          <p>Im <strong>Terminal</strong> (Homebrew vorausgesetzt, <a href="https://brew.sh">brew.sh</a>):</p>
+          <pre><code>xcode-select --install
+brew install node mkcert git
+mkcert -install</code></pre>
+        </li>
+        <li>
+          <h4>Copper Deck holen und installieren</h4>
+          <pre><code>git clone https://github.com/Mauriziofio09/mobileStreamDeck.git
+cd mobileStreamDeck
+scripts/install.sh</code></pre>
+          <p>Das Skript baut alles, richtet den Helper als LaunchAgent ein (startet bei der Anmeldung) und legt das Lightroom-Plugin ab.</p>
+        </li>
+        <li>
+          <h4>Berechtigungen erteilen</h4>
+          <p>macOS fragt nach <strong>Bedienungshilfen</strong>, <strong>Automation</strong> und <strong>Mitteilungen</strong> für „Copper Deck Helper“. Alle erlauben. Den Stand zeigt <code>copper-deck permissions</code> oder in der App unter About.</p>
+        </li>
+      </ol>
+      <!--/mac-->
+      <!--win-->
+      <ol class="steps">
+        <li>
+          <h4>Werkzeuge installieren</h4>
+          <p>In <strong>PowerShell</strong> (keine Administratorrechte nötig):</p>
+          <pre><code>winget install OpenJS.NodeJS.LTS
+winget install FiloSottile.mkcert
+winget install Git.Git</code></pre>
+          <p>PowerShell danach schliessen und neu öffnen, dann:</p>
+          <pre><code>mkcert -install</code></pre>
+        </li>
+        <li>
+          <h4>Copper Deck holen und installieren</h4>
+          <pre><code>git clone https://github.com/Mauriziofio09/mobileStreamDeck.git
+cd mobileStreamDeck
+powershell -ExecutionPolicy Bypass -File scripts\install.ps1</code></pre>
+          <p>Das Skript baut alles, auch das kleine Windows-Programm (mit dem C#-Compiler, der in Windows steckt), richtet den Autostart über die Aufgabenplanung ein und legt das Lightroom-Plugin ab.</p>
+        </li>
+        <li>
+          <h4>Firewall und Netzwerk</h4>
+          <p>Fragt Windows nach <strong>Node.js</strong>: für <strong>private Netzwerke</strong> zulassen. Ist dein WLAN als „öffentlich“ eingestuft, unter Einstellungen → Netzwerk und Internet → WLAN auf <strong>Privat</strong> stellen.</p>
+        </li>
+      </ol>
+      <!--/win-->
+    </section>
+
+    <section id="iphone" class="split">
+      <div>
+        <h2>iPhone und iPad einrichten</h2>
+        <ol class="steps compact">
+          <li>
+            <h4>Zertifikat vertrauen</h4>
+            <!--mac--><p><code>copper-deck ca</code> zeigt <code>rootCA.pem</code> im Finder. Per <strong>AirDrop</strong> aufs iPhone senden (oder über iCloud Drive → App Dateien).</p><!--/mac-->
+            <!--win--><p><code>copper-deck ca</code> zeigt <code>rootCA.pem</code> im Explorer. Per Mail an dich selbst oder über OneDrive/iCloud aufs iPhone bringen und antippen.</p><!--/win-->
+            <p>Dann <strong>Einstellungen → Profil geladen → Installieren</strong> und unter <strong>Allgemein → Info → Zertifikatsvertrauenseinstellungen</strong> für „mkcert“ einschalten.</p>
+          </li>
+          <li>
+            <h4>Zum Home-Bildschirm</h4>
+            <p>In <strong>Safari</strong> die Adresse öffnen, die das Installationsskript am Ende zeigt (z. B. <code>{{EXAMPLE_URL}}</code>) → Teilen → <strong>Zum Home-Bildschirm</strong>.</p>
+          </li>
+          <li>
+            <h4>Koppeln</h4>
+            <p>Am {{HOST}} <code>copper-deck pair</code> ausführen und den 6-stelligen Code in der App eingeben. Fertig.</p>
+          </li>
+        </ol>
+        <p class="tip"><strong>iPhone und {{HOST}} müssen sich erreichen.</strong> Zuhause im selben WLAN klappt das. Firmen- und Gäste-WLANs trennen Geräte oft voneinander, dann hilft Tailscale (unten).</p>
+      </div>
+      <figure class="shot phone-shot">
+        <img src="img/deck-iphone.webp" alt="Copper Deck auf dem iPhone im Querformat" width="1000" height="461" loading="lazy" />
+        <img src="img/edit-ipad.webp" alt="Bearbeitungsmodus auf dem iPad: Kacheln, Emoji-Leiste und Dock wackeln" width="1400" height="973" loading="lazy" />
+      </figure>
+    </section>
+
+    <section id="unterwegs">
+      <h2>Unterwegs mit Tailscale</h2>
+      <p>Mit <a href="https://tailscale.com/download">Tailscale</a> verbindet sich das iPhone überall direkt mit deinem {{HOST}}: zuhause, im Firmen-WLAN und über Mobilfunk. Kostenlos für private Nutzung.</p>
+      <ol class="steps compact">
+        <li><p>Tailscale auf {{HOST}} und iPhone installieren, mit <strong>demselben Konto</strong> anmelden.</p></li>
+        <li><p>Im Tailscale-Admin unter <strong>DNS</strong> „MagicDNS“ und „HTTPS Certificates“ aktivieren.</p></li>
+        <li><p><code>copper-deck tailscale</code> zeigt deine Adresse (<code>https://…ts.net:7443</code>). Diese in Safari öffnen, zum Home-Bildschirm hinzufügen, koppeln. Copper Deck holt dafür ein echtes Zertifikat, das iPhone braucht kein Profil.</p></li>
+      </ol>
+    </section>
+
+    <section id="lightroom" class="split reverse">
+      <figure class="shot">
+        <img src="img/lightroom-ipad.webp" alt="Lightroom-Tab auf dem iPad: Regler für Weissabgleich, Ton und Präsenz" width="1400" height="973" loading="lazy" />
+      </figure>
+      <div>
+        <h2>Lightroom Classic</h2>
+        <p>Der Tab <strong>LR</strong> steuert Lightroom Classic (ab Version 10) direkt: 64 Regler von Belichtung bis Color Grading, Sterne, Markierungen, Farben, nächstes Foto, Vorgaben, Kopieren/Einfügen, Vorher/Nachher und Export.</p>
+        <ul class="list">
+          <li>Das Plugin installiert das Skript mit. Nach der Installation Lightroom Classic einmal neu starten.</li>
+          <li>Regler relativ ziehen; Finger beim Ziehen nach oben wegbewegen = feiner. Doppeltippen setzt zurück.</li>
+          <li>Änderungen am {{HOST}} erscheinen live auf dem iPhone.</li>
+        </ul>
+        <p class="fine">Hinweis: Nur Lightroom <strong>Classic</strong> hat die dafür nötige Plugin-Schnittstelle, nicht die Cloud-Version „Lightroom“.</p>
+      </div>
+    </section>
+
+    <section id="hilfe">
+      <h2>Hilfe</h2>
+      <div class="faq">
+        <details>
+          <summary>Safari lädt die Seite nicht („Server reagiert nicht“)</summary>
+          <p>iPhone und {{HOST}} erreichen sich nicht. Sind beide im selben WLAN (nicht Gäste-WLAN)? Firmennetze trennen Geräte oft: dann Tailscale verwenden oder den Hotspot des iPhones.<!--win--> Unter Windows ausserdem: Netzwerkprofil „Privat“ und Firewall-Freigabe für Node.js.<!--/win--></p>
+        </details>
+        <details>
+          <summary>„Diese Verbindung ist nicht privat“</summary>
+          <p>Das mkcert-Zertifikat ist auf dem iPhone nicht installiert oder nicht freigegeben. Profil installieren und unter Zertifikatsvertrauenseinstellungen einschalten. Mit Tailscale entfällt das.</p>
+        </details>
+        <details>
+          <summary>Code abgelaufen oder „Kein aktiver Code“</summary>
+          <p>Mit <code>copper-deck pair</code> einen neuen holen. Ein Code gilt 5 Minuten und nur einmal.</p>
+        </details>
+        <!--mac-->
+        <details>
+          <summary>Tastenkombination oder Emoji kommt nicht an</summary>
+          <p>In der App unter About die Berechtigungen prüfen. Bedienungshilfen und Automation für „Copper Deck Helper“ erlauben.</p>
+        </details>
+        <!--/mac-->
+        <!--win-->
+        <details>
+          <summary>Tastenkombination oder Emoji kommt nicht an</summary>
+          <p>Läuft das Fenster im Vordergrund als Administrator (z. B. Task-Manager), lässt Windows keine Eingaben von Copper Deck zu. Die App nennt das Programm.</p>
+        </details>
+        <details>
+          <summary>„Ausführung von Skripts ist deaktiviert“</summary>
+          <p>Das Skript wie oben mit <code>-ExecutionPolicy Bypass</code> starten.</p>
+        </details>
+        <!--/win-->
+        <details>
+          <summary>Lightroom: „nicht verbunden“</summary>
+          <p>Lightroom Classic starten und unter Datei → Zusatzmodul-Manager prüfen, ob „Copper Deck“ aktiv ist. Nach der ersten Installation Lightroom einmal neu starten.</p>
+        </details>
+        <details>
+          <summary>Aktualisieren</summary>
+          <p>Im Ordner <code>git pull</code>, dann das Installationsskript erneut ausführen. Die App auf dem iPhone bietet danach „Aktualisieren“ an.</p>
+        </details>
+      </div>
+      <p>Die vollständige Anleitung mit allen Befehlen steht im <a href="https://github.com/Mauriziofio09/mobileStreamDeck#readme">README auf GitHub</a>.</p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Copper Deck {{VERSION}}</span>
+    <a href="{{OTHER_URL}}">Copper Deck für {{OTHER_SYSTEM}}</a>
+    <a href="https://github.com/Mauriziofio09/mobileStreamDeck">GitHub</a>
+  </footer>
+</body>
+</html>

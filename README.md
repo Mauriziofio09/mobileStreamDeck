@@ -28,6 +28,7 @@ iPhone / iPad (PWA, Vollbild)  ──WSS/HTTPS im WLAN──▶  Copper Deck Hel
 18. [Windows](#18-windows)
 19. [Lightroom Classic](#19-lightroom-classic)
 20. [Unterwegs mit Tailscale](#20-unterwegs-mit-tailscale)
+21. [Startseiten (Website)](#21-startseiten-website)
 
 ---
 
@@ -481,4 +482,35 @@ Im selben WLAN verbindet sich das iPhone direkt mit dem Mac/PC. In Netzen, die G
 - **„HTTPS im Tailscale-Netz aktivieren“:** login.tailscale.com → DNS → HTTPS Certificates.
 - **Seite lädt unterwegs nicht:** Ist Tailscale auf dem iPhone eingeschaltet (VPN-Symbol)? `tailscale ping copperdeck-mac` am iPhone bzw. in der Tailscale-App prüfen.
 - **macOS:** Die Tailscale-App ist zugleich die CLI; der Helper ruft sie mit `TAILSCALE_BE_CLI=1` auf, sonst versucht sie unter launchd ihr Fenster zu öffnen.
+
+## 21. Startseiten (Website)
+
+Zwei öffentliche Seiten erklären Copper Deck und die Installation, je eine für Mac und Windows:
+
+- https://macmobilestreamdeck.battle-isle.app
+- https://windowsmobilestreamdeck.battle-isle.app
+
+Sie sind rein informativ (Download über GitHub, Anleitung, Hilfe). Die eigentliche App läuft weiterhin auf jedem Mac/PC selbst, weil nur der Helper auf dem eigenen Rechner Apps öffnen und Tasten senden kann.
+
+**Quelle:** `site/src/page.html` ist eine gemeinsame Vorlage mit Blöcken `<!--mac-->…<!--/mac-->` und `<!--win-->…<!--/win-->`; `node site/build.mjs` erzeugt `site/dist/mac` und `site/dist/windows`. Bilder: `node site/make-images.mjs` (aus lokalen Screenshots).
+
+**Server** (wie photoAI, Hetzner-VPS `deploy@78.47.125.152`):
+
+```
+Browser ──https──▶ Caddy (game-caddy-1, ~/game) ──http──▶ mobilestreamdeck-web (nginx, ~/mobilestreamdeck)
+```
+
+- **DNS** bei Cloudflare: `A macmobilestreamdeck → 78.47.125.152` und `A windowsmobilestreamdeck → 78.47.125.152`, **nur DNS (graue Wolke)**. Das Zertifikat holt Caddy bei Let's Encrypt.
+- Ein nginx-Container für beide Seiten (unterschieden am Host), read-only, am Netzwerk `game_default`.
+- Caddy setzt die Sicherheits-Header (strikte CSP ohne Inline-Skript, HSTS).
+
+**Erstes Mal:** `sh site/deploy/deploy.sh --setup`, danach den Caddy-Block einmalig anhängen, prüfen und neu laden:
+
+```sh
+cd ~/game/deploy && cp Caddyfile Caddyfile.bak-$(date +%F)-mobilestreamdeck && cat ~/mobilestreamdeck/Caddyfile.mobilestreamdeck >> Caddyfile
+docker exec game-caddy-1 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+docker exec game-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+```
+
+**Update:** `sh site/deploy/deploy.sh`
 
