@@ -274,3 +274,29 @@ Hier steht, was ich selbst entschieden habe. Neue Einträge kommen jeweils unten
 ### Testskripte
 - `e2e-m2-offline.mjs` stoppt den LaunchAgent jetzt mit `launchctl bootout/bootstrap`. Vorher hat es den Helper von Hand beendet und gestartet, was mit KeepAlive kollidiert.
 - `e2e-m2.mjs` erwartet keine „Kommt in M3“-Meldung mehr.
+
+## Nach Meilenstein 5 – Emoji-Leiste und Dock bearbeiten (Version 0.6.0)
+
+### Bedienung
+- **Gleicher Bearbeitungsmodus wie die Kacheln:** langes Drücken auf eine Kachel, ein Emoji oder ein Dock-Icon startet ihn. Einträge wackeln, haben ein „–“ (zweimal tippen) und am Ende ein „+“.
+- **Antippen:** Emoji öffnet einen kleinen Editor (Eingabefeld für die Emoji-Tastatur plus 16 Vorschläge). Dock-Icon öffnet direkt die App-Auswahl und **ersetzt** die App; die ID bleibt gleich.
+- **Umsortieren fügt ein statt zu tauschen.** Emoji-Leiste und Dock sind geordnete Listen ohne feste Plätze; Einfügen mit Nachrücken ist dort das erwartete Verhalten. Während des Ziehens rückt die Liste live nach.
+- **Kurz halten (200 ms), dann ziehen.** Dock und (bei 16 Emojis am iPhone) die Emoji-Leiste scrollen horizontal. Sofortiges Wischen bleibt deshalb Scrollen. Sobald das Ziehen scharf ist, verhindert ein nicht-passiver `touchmove`-Listener das native Scrollen von iOS. Am Dock-Rand scrollt es beim Ziehen automatisch.
+- **Keine doppelten Apps im Dock:** Die App-Auswahl markiert Apps, die schon im Dock sind, und lehnt sie mit Hinweis ab.
+- **Grenzen** wie im Schema des Helpers: 16 Emojis, 40 Dock-Einträge. Die Beschriftung im Dock ist der App-Name, auf 40 Zeichen gekürzt.
+- **iPhone:** Hochkant ersetzt die Bearbeitungsleiste Uhr und Pille, deshalb gibt es dort den Knopf „Leiste & Dock“, der das Overlay öffnet.
+- **iPad:** „+ Gruppe“ und „Fertig“ stehen übereinander, weil die Emoji-Leiste durch das „+“ breiter wird und sonst darunter verschwindet.
+- Eine leere Emoji-Leiste wird ausserhalb des Bearbeitungsmodus ausgeblendet.
+
+### Technik
+- **Kein Helper-Änderung nötig:** `saveConfig` prüfte Emojis und Dock schon in Meilenstein 4 gegen das Schema (Revision, eindeutige IDs, Grenzen).
+- `ReorderController` (`web/src/app/core/reorder.ts`) kapselt Tippen, langes Drücken und Umsortieren für beide Listen. Die App-Auswahl ist als `cd-app-picker` aus dem Kachel-Editor herausgelöst und wird im Dock-Editor wiederverwendet.
+- Die Bestätigung beim Entfernen (zweites Tippen) liegt jetzt in `core/confirm.ts` und unterscheidet Einträge per ID statt per Beschriftung.
+
+### Tests
+- `tools/e2e-bar.mjs`: iPad und iPhone gleichzeitig gegen launchd, 22 Prüfungen. Der Test fängt alle `run`-Nachrichten ab, damit am Mac nichts eingefügt oder geöffnet wird, und prüft so zugleich, dass langes Drücken und Ziehen keine Aktion auslösen.
+- **Nicht automatisch prüfbar:** Ziehen und Scrollen mit dem Finger auf echten Geräten (Playwright steuert per Maus).
+
+### Einrichtung in isolierten Netzen
+- Im Firmen-WLAN kam das iPhone nicht an den Mac (Zeitüberschreitung, auch mit IP-Adresse): Client Isolation. Gelöst mit dem iPhone-Hotspot per USB. Im README unter Fehlerbehebung ergänzt, dazu iCloud Drive bzw. Mail als Weg für das Zertifikat, wenn AirDrop nicht geht.
+- Ich erlaube die IP-Adresse bewusst **nicht** als zusätzlichen Origin: Sie ändert sich je nach Netz, und die App auf dem Home-Bildschirm ist an ihre Adresse gebunden.

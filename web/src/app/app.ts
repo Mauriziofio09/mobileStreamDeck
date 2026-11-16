@@ -12,6 +12,7 @@ import { OfflineComponent } from './ui/offline.component';
 import { PairingComponent } from './ui/pairing.component';
 import { SideControlsComponent } from './ui/side-controls.component';
 import { TileEditorComponent } from './ui/tile-editor.component';
+import { BarItemEditorComponent } from './ui/bar-item-editor.component';
 import { EditorService } from './core/editor.service';
 import { UpdateService } from './core/update.service';
 
@@ -19,7 +20,7 @@ import { UpdateService } from './core/update.service';
   selector: 'app-root',
   imports: [
     PagerComponent, PageDotsComponent, EmojiBarComponent, DockComponent,
-    SideControlsComponent, SheetsComponent, SurfaceDirective, PairingComponent, OfflineComponent, TileEditorComponent,
+    SideControlsComponent, SheetsComponent, SurfaceDirective, PairingComponent, OfflineComponent, TileEditorComponent, BarItemEditorComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {

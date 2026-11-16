@@ -71,6 +71,7 @@ iOS vertraut der Verbindung erst, wenn die **Root-CA von mkcert** installiert **
 1. Am Mac: `copper-deck ca`. Der Finder zeigt die Datei **`rootCA.pem`**.
    > ⚠️ Gib nur `rootCA.pem` weiter, **niemals** `rootCA-key.pem`.
 2. `rootCA.pem` per **AirDrop** ans iPhone bzw. iPad senden (Rechtsklick → Teilen → AirDrop). Auf dem Gerät erscheint „Profil geladen“. Fragt das iPad nach dem Gerät, wähle das iPad.
+   > Geht AirDrop nicht: `rootCA.pem` in den iCloud Drive legen und auf dem Gerät in der App **Dateien** antippen, oder per Mail an dich selbst schicken und den Anhang in Mail antippen. Danach die Kopie im iCloud Drive wieder löschen.
 3. Auf dem Gerät **Einstellungen** öffnen. Ganz oben steht **„Profil geladen“**; falls nicht: **Allgemein → VPN und Geräteverwaltung**.
 4. Das Profil **„mkcert …“** antippen → **Installieren** → Gerätecode eingeben → **Installieren** bestätigen.
 5. **Wichtig:** **Einstellungen → Allgemein → Info → Zertifikatsvertrauenseinstellungen** öffnen (ganz unten auf der Info-Seite).
@@ -148,6 +149,15 @@ Alle Berechtigungen gelten für **„Copper Deck Helper“**, nicht für Termina
   - **Eigenes Bild:** PNG, JPEG oder WebP bis 2 MB (kein SVG)
 - **Leerer Platz antippen:** neue Kachel. **„–“ zweimal antippen:** Kachel entfernen.
 - **„+ Gruppe“** legt eine leere Gruppe an; eine leere Gruppe lässt sich mit **„Gruppe entfernen“** löschen. **„Fertig“** beendet den Modus.
+
+### Emoji-Leiste und Dock
+
+Im Bearbeitungsmodus lassen sich auch Emoji-Leiste und Dock bearbeiten. Den Modus startet auch langes Drücken auf ein Emoji oder ein Dock-Icon. Am iPhone öffnet **„Leiste & Dock“** in der Bearbeitungsleiste die beiden.
+
+- **Antippen:** Emoji ändern (Emoji-Tastatur oder Vorschläge) bzw. die App im Dock ersetzen (App-Auswahl).
+- **„+“** am Ende fügt ein Emoji (höchstens 16) bzw. eine App (höchstens 40) hinzu. Eine App, die schon im Dock ist, wird nicht doppelt aufgenommen.
+- **„–“ zweimal antippen** entfernt den Eintrag.
+- **Umsortieren:** kurz halten (0,2 s), dann ziehen. Der Eintrag wird an der neuen Stelle **eingefügt**, die anderen rücken nach. Am Rand des Docks scrollt es beim Ziehen mit. Sofortiges Wischen ohne Halten scrollt Leiste bzw. Dock.
 
 **Speichern:** Jede Änderung speichert der Helper sofort und zeigt sie **live auf allen Geräten**. Haben zwei Geräte gleichzeitig etwas geändert, gewinnt die zuerst gespeicherte Änderung. Das andere Gerät meldet „Ein anderes Gerät hat inzwischen etwas geändert“ und lädt den aktuellen Stand.
 
@@ -264,6 +274,7 @@ Das Skript stoppt den LaunchAgent und entfernt App-Bundle, Laufzeitdateien und C
 **Safari findet `….local` nicht**
 - Ist das Gerät im selben WLAN wie der Mac, nicht im Gäste-WLAN und nicht über Mobilfunk verbunden? Manche Netze blockieren mDNS (`.local`) oder isolieren Geräte voneinander (Client Isolation).
 - Den Namen prüfen: Systemeinstellungen → Allgemein → Freigaben → „Lokaler Hostname“.
+- **Seite lädt ewig bzw. „Server reagiert nicht mehr“** (auch mit der IP-Adresse des Macs): Das Netz isoliert die Geräte voneinander, typisch für Firmen-, Schul- und Gäste-WLANs. Dagegen hilft nur ein anderes Netz, am einfachsten der **persönliche Hotspot** des iPhones. Lässt sich der Hotspot nicht per WLAN aktivieren, das iPhone **per USB-Kabel** anschliessen, Hotspot einschalten und am Mac das WLAN ausschalten. Das Zertifikat gilt weiter, weil es auf den `.local`-Namen ausgestellt ist.
 - Hast du den Mac umbenannt? Dann den Helper neu starten (`launchctl kickstart -k …`). Er stellt das Zertifikat für den neuen Namen aus. Danach die App auf dem Home-Bildschirm entfernen und mit der neuen Adresse neu hinzufügen.
 
 **Die App zeigt „Mac nicht erreichbar“ oder bleibt offline**
@@ -339,6 +350,7 @@ node --import tsx tools/make-assets.mts  # Icons und Splash-Screens neu erzeugen
 | `node tools/e2e-m3.mjs basic` | Stage Manager, Timer, Neustart, Berechtigungsfehler |
 | `node tools/e2e-m3-perms.mjs` | Tastatur mit Schweizer Layout, Emoji und Zwischenablage, Fenster, Mitteilung. Öffnet TextEdit und ordnet deine Fenster neu an. |
 | `node tools/e2e-m4.mjs` | zwei Geräte gleichzeitig: Bearbeiten, Ziehen, Editor, Bilder, Live-Sync, Konflikt |
+| `node tools/e2e-bar.mjs` | zwei Geräte: Emoji-Leiste und Dock bearbeiten, umsortieren, Live-Sync (fängt alle Aktionen ab) |
 | `node tools/e2e-m5-update.mjs` | App-Update über den Service Worker (führt `install.sh` aus) |
 
 Getroffene Entscheidungen und Abwägungen stehen in [DECISIONS.md](DECISIONS.md).

@@ -57,6 +57,15 @@ export class DeckStore {
     this.toastTimer = setTimeout(() => this.currentToast.set(null), kind === 'error' ? 3200 : 1800);
   }
 
+  /** Langes Drücken: Bearbeitungsmodus starten (nur mit Verbindung). */
+  enterEditMode(): void {
+    if (!this.conn.online()) {
+      this.toast('Bearbeiten ist nur mit Verbindung zum Mac möglich.', 'error');
+      return;
+    }
+    this.editMode.set(true);
+  }
+
   goTo(index: number): void {
     const max = this.pages().length - 1;
     this.page.set(Math.max(0, Math.min(max, index)));

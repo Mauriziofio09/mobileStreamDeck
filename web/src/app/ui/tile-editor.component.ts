@@ -8,6 +8,7 @@ import { EditorService, newId } from '../core/editor.service';
 import { MediaService } from '../core/media.service';
 import { SurfaceDirective } from '../core/surface.directive';
 import { TileComponent } from './tile.component';
+import { AppPickerComponent, type AppEntry } from './app-picker.component';
 
 type IconType = TileIcon['type'];
 
@@ -29,11 +30,9 @@ const KEY_NAME: Partial<Record<HotkeyKey, string>> = {
   up: 'Pfeil ↑', down: 'Pfeil ↓', left: 'Pfeil ←', right: 'Pfeil →', home: 'Pos1', end: 'Ende', pageup: 'Bild ↑', pagedown: 'Bild ↓',
 };
 
-interface AppEntry { bundleId: string; name: string }
-
 @Component({
   selector: 'cd-tile-editor',
-  imports: [SurfaceDirective, TileComponent],
+  imports: [SurfaceDirective, TileComponent, AppPickerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './tile-editor.component.html',
   styleUrl: './tile-editor.component.css',
@@ -69,14 +68,6 @@ export class TileEditorComponent {
 
   // App-Auswahl
   protected readonly picking = signal(false);
-  protected readonly apps = signal<AppEntry[] | null>(null);
-  protected readonly appsError = signal<string | null>(null);
-  protected readonly query = signal('');
-  protected readonly filteredApps = computed(() => {
-    const q = this.query().trim().toLocaleLowerCase('de');
-    const list = this.apps() ?? [];
-    return q ? list.filter((a) => a.name.toLocaleLowerCase('de').includes(q) || a.bundleId.toLowerCase().includes(q)) : list;
-  });
 
   protected readonly isNew = computed(() => !this.editor.editing()?.tile);
 
@@ -141,7 +132,6 @@ export class TileEditorComponent {
   private load(tile: Tile | null): void {
     this.newTileId = newId('t');
     this.uploadError.set(null);
-    this.query.set('');
     this.picking.set(false);
     if (!tile) {
       this.kind.set('action');
@@ -199,14 +189,8 @@ export class TileEditorComponent {
 
   protected hotkeyText = computed(() => `${this.mods().map((m) => MOD_SYMBOL[m]).join('')}${this.keyLabel(this.key())}`);
 
-  protected async openPicker(): Promise<void> {
+  protected openPicker(): void {
     this.picking.set(true);
-    if (this.apps()) return;
-    try {
-      this.apps.set(await this.catalog.listInstalled());
-    } catch {
-      this.appsError.set('App-Liste konnte nicht geladen werden.');
-    }
   }
 
   protected pick(a: AppEntry): void {

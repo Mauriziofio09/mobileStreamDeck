@@ -129,24 +129,7 @@
           <button type="button" class="primary" cdSurface="tile-brown" [cdRadius]="0.3" [disabled]="errors().length > 0" (click)="save()">Sichern</button>
         </footer>
       } @else {
-        <header class="pick-head">
-          <button type="button" class="ghost" (click)="picking.set(false)">‹ Zurück</button>
-          <h2>App auswählen</h2>
-        </header>
-        <input class="search" type="search" placeholder="Suchen" autocapitalize="off" autocorrect="off" [value]="query()" (input)="query.set(text($event))" />
-        @if (appsError(); as err) { <p class="error">{{ err }}</p> }
-        @if (!apps() && !appsError()) { <p class="muted">Lade installierte Apps …</p> }
-        <ul class="apps">
-          @for (a of filteredApps(); track a.bundleId) {
-            <li>
-              <button type="button" [class.on]="a.bundleId === bundleId()" (click)="pick(a)">
-                @if (catalog.iconUrl(a.bundleId); as src) { <img [src]="src" alt="" loading="lazy" /> } @else { <span class="noicon"></span> }
-                <span class="name">{{ a.name }}</span>
-                <span class="bid">{{ a.bundleId }}</span>
-              </button>
-            </li>
-          }
-        </ul>
+        <cd-app-picker [selected]="bundleId()" (picked)="pick($event)" (back)="picking.set(false)" />
       }
     </div>
   </div>

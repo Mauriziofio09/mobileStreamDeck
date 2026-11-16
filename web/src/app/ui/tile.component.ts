@@ -11,6 +11,7 @@ import { GESTURE, GestureBus } from '../core/gestures';
 import { SurfaceDirective, SurfaceVariant } from '../core/surface.directive';
 import { TimerService } from '../core/timer.service';
 import { IconComponent } from './icons';
+import { confirmRemoval } from '../core/confirm';
 
 type Status = 'idle' | 'busy' | 'ok' | 'error';
 
@@ -259,7 +260,7 @@ export class TileComponent {
     e.stopPropagation();
     const t = this.tile();
     if (!t || !this.groupId()) return;
-    if (confirmRemoval(t.label)) this.editor.remove({ groupId: this.groupId()!, index: this.index() });
+    if (confirmRemoval(t.id, t.label)) this.editor.remove({ groupId: this.groupId()!, index: this.index() });
   }
 
   protected cancel(): void {
@@ -288,20 +289,4 @@ export class TileComponent {
     if (this.statusTimer) clearTimeout(this.statusTimer);
     this.statusTimer = setTimeout(() => this.status.set('idle'), result.ok ? 900 : 1800);
   }
-}
-
-/**
- * Bestätigung ohne Browser-Dialog (window.confirm blockiert und ist in iOS-PWAs unschön):
- * zweites Tippen innerhalb von 3 s bestätigt.
- */
-let pendingRemoval: { label: string; until: number } | null = null;
-function confirmRemoval(label: string): boolean {
-  const now = Date.now();
-  if (pendingRemoval && pendingRemoval.label === label && now < pendingRemoval.until) {
-    pendingRemoval = null;
-    return true;
-  }
-  pendingRemoval = { label, until: now + 3000 };
-  window.dispatchEvent(new CustomEvent('cd-toast', { detail: `„${label}“ entfernen? Zum Bestätigen nochmals tippen.` }));
-  return false;
 }

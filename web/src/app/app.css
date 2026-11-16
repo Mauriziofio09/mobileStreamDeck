@@ -184,3 +184,6 @@
 }
 .update button { border: 0; background: transparent; color: var(--c-text-cream); font: 700 16px var(--font-label); text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 16px; }
 :host(.bar-inline) .update { bottom: calc(var(--sa-b) + 122px); }
+
+/* iPad: Bearbeitungsknöpfe übereinander, damit sie die (im Bearbeitungsmodus breitere) Emoji-Leiste nicht überdecken. */
+:host(.bar-inline:not(.is-phone)) .edit-bar { flex-direction: column; align-items: stretch; }
