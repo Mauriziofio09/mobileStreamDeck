@@ -13,6 +13,7 @@ import { PairingComponent } from './ui/pairing.component';
 import { SideControlsComponent } from './ui/side-controls.component';
 import { TileEditorComponent } from './ui/tile-editor.component';
 import { BarItemEditorComponent } from './ui/bar-item-editor.component';
+import { LightroomComponent } from './ui/lightroom.component';
 import { EditorService } from './core/editor.service';
 import { UpdateService } from './core/update.service';
 import { PlatformService } from './core/platform.service';
@@ -21,7 +22,7 @@ import { PlatformService } from './core/platform.service';
   selector: 'app-root',
   imports: [
     PagerComponent, PageDotsComponent, EmojiBarComponent, DockComponent,
-    SideControlsComponent, SheetsComponent, SurfaceDirective, PairingComponent, OfflineComponent, TileEditorComponent, BarItemEditorComponent,
+    SideControlsComponent, SheetsComponent, SurfaceDirective, PairingComponent, OfflineComponent, TileEditorComponent, BarItemEditorComponent, LightroomComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {

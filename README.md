@@ -26,6 +26,7 @@ iPhone / iPad (PWA, Vollbild)  ──WSS/HTTPS im WLAN──▶  Copper Deck Hel
 16. [Fehlerbehebung](#16-fehlerbehebung)
 17. [Entwicklung](#17-entwicklung)
 18. [Windows](#18-windows)
+19. [Lightroom Classic](#19-lightroom-classic)
 
 ---
 
@@ -351,6 +352,7 @@ node --import tsx tools/make-assets.mts  # Icons und Splash-Screens neu erzeugen
 | `node tools/e2e-m3.mjs basic` | Stage Manager, Timer, Neustart, Berechtigungsfehler |
 | `node tools/e2e-m3-perms.mjs` | Tastatur mit Schweizer Layout, Emoji und Zwischenablage, Fenster, Mitteilung. Öffnet TextEdit und ordnet deine Fenster neu an. |
 | `node tools/e2e-m4.mjs` | zwei Geräte gleichzeitig: Bearbeiten, Ziehen, Editor, Bilder, Live-Sync, Konflikt |
+| `node tools/e2e-lightroom.mjs` | Lightroom-Tab mit nachgebildetem Plugin: Regler, Bewertung, Vorgaben, Live-Sync, Trennen |
 | `node tools/e2e-bar.mjs` | zwei Geräte: Emoji-Leiste und Dock bearbeiten, umsortieren, Live-Sync (fängt alle Aktionen ab) |
 | `node tools/e2e-m5-update.mjs` | App-Update über den Service Worker (führt `install.sh` aus) |
 
@@ -419,4 +421,38 @@ Das Skript baut Web-App und Helper, baut `CopperDeckHelper.exe` mit dem C#-Compi
 - **`<computername>.local` wird nicht gefunden:** Windows meldet den Namen per mDNS; manche Netze blockieren das. Computername prüfen mit `hostname`. Er darf nur Buchstaben, Ziffern und Bindestriche enthalten.
 - **Helper startet nicht:** `%LOCALAPPDATA%\CopperDeck\Logs\launcher.log` ansehen.
 - **csc.exe meldet Fehler:** Die Ausgabe von `install.ps1` aufbewahren; sie nennt Datei und Zeile im C#-Code.
+
+## 19. Lightroom Classic
+
+Der Tab **LR** (Pille rechts bzw. unten) macht iPhone und iPad zu einem Bedienpult für **Lightroom Classic** (ab Version 10) auf dem Mac oder PC.
+
+> **Stand:** Das Lightroom-Plugin ist **noch nicht in echtem Lightroom getestet** (hier ist Lightroom Classic nicht installiert). Geprüft ist der ganze Weg App → Helper → Plugin-Schnittstelle mit einem nachgebildeten Plugin (`tools/fake-lightroom.mjs`).
+
+### Einrichtung
+1. Lightroom Classic installieren (Creative Cloud).
+2. `scripts/install.sh` (Mac) bzw. `scripts\install.ps1` (Windows) erneut ausführen. Das Skript legt das Plugin in den **Modules**-Ordner von Lightroom:
+   - Mac: `~/Library/Application Support/Adobe/Lightroom/Modules/CopperDeck.lrplugin`
+   - Windows: `%APPDATA%\Adobe\Lightroom\Modules\CopperDeck.lrplugin`
+3. Lightroom Classic **neu starten**. Unter Datei → Zusatzmodul-Manager steht dann „Copper Deck“ als aktiv.
+4. In der App auf **LR** tippen. Der grüne Punkt zeigt: verbunden. Die Verbindung kommt nach wenigen Sekunden von selbst, auch wenn Lightroom später gestartet wird.
+
+### Funktionen
+- **Kopf:** vorheriges/nächstes Foto, Dateiname, **Sterne** (erneut tippen entfernt), **Auswahl / Abgelehnt**, **Farbmarkierung**, Modul **Bibliothek / Entwickeln**, Rückgängig/Wiederholen.
+- **Regler** wie im Entwickeln-Modul: Grundeinstellungen (Weissabgleich, Ton, Präsenz), Gradationskurve, HSL (Farbton/Sättigung/Luminanz je 8 Farben), Color Grading, Details (Schärfen, Rauschreduzierung), Effekte (Vignettierung, Körnung).
+  - **Ziehen** verändert relativ zum Startpunkt (kein Sprung beim Antippen). Finger beim Ziehen **nach oben oder unten wegbewegen = feiner** (halbe bzw. viertel Geschwindigkeit).
+  - **−/+** verwenden die Schrittweite von Lightroom, **Doppeltippen** setzt den Regler zurück.
+  - Die Werte in der App folgen Lightroom live, auch wenn du am Rechner änderst.
+- **Vorgaben:** alle Entwicklungsvorgaben nach Ordnern; Tippen wendet sie auf die ausgewählten Fotos an.
+- **Schnellaktionen:** Auto, Auto-Weissabgleich, Einstellungen kopieren/einfügen, Vorher/Nachher, Zuschneiden, Masken, alles zurücksetzen (zweimal tippen), **Exportieren** (= „Mit vorherigen Einstellungen exportieren“; der Helper holt Lightroom nach vorne und sendet ⌘⌥⇧E bzw. Strg+Alt+Umschalt+E).
+
+### Sicherheit
+- Das Plugin öffnet nur lokale Ports (127.0.0.1: 47801/47802); von aussen ist es nicht erreichbar. Geräte sprechen nur mit dem Helper.
+- Befehle und Regler stammen aus einer festen Liste; Helper und Plugin prüfen sie beide. Es gibt keinen Weg, Lua-Code oder beliebige Einstellungen auszuführen.
+
+### Fehlerbehebung Lightroom
+- **„Lightroom Classic nicht verbunden“:** Läuft Lightroom Classic? Ist „Copper Deck“ im Zusatzmodul-Manager aktiv (sonst „Aktivieren“)? Nach dem ersten Installieren muss Lightroom neu gestartet werden.
+- **Regler sind grau:** Lightroom ist in der Bibliothek, oder kein Foto ist ausgewählt. „Zu Entwickeln wechseln“ tippen.
+- **Exportieren macht nichts:** Lightroom braucht dafür einmal einen normalen Export (die „vorherigen Einstellungen“). Auf dem Mac sind Bedienungshilfen für „Copper Deck Helper“ nötig.
+- **Port belegt:** Ein anderes Programm nutzt 47801/47802 (sehr selten). Dann im Helper-Log nachsehen.
+- Für Entwicklung ohne Lightroom: `node tools/fake-lightroom.mjs` simuliert das Plugin.
 

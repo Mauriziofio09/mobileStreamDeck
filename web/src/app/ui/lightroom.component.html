@@ -1,0 +1,118 @@
+<div class="lr" cdSurface="sheet" [cdRadius]="0.04">
+  @if (!lr.connected()) {
+    <div class="empty">
+      <span class="big"><cd-icon name="aperture" /></span>
+      <h2>Lightroom Classic nicht verbunden</h2>
+      <ol>
+        <li>Lightroom Classic am {{ platform.host() }} starten.</li>
+        <li>Das Plugin <strong>Copper Deck</strong> muss aktiv sein: Datei → Zusatzmodul-Manager. Es wird mit
+          <code>{{ platform.isWindows() ? 'install.ps1' : 'install.sh' }}</code> installiert.</li>
+        <li>Die Verbindung kommt danach von selbst, innerhalb weniger Sekunden.</li>
+      </ol>
+    </div>
+  } @else {
+    <!-- Kopf: Navigation, Foto, Bewertung, Markierungen, Modul -->
+    <header class="top">
+      <div class="nav">
+        <button type="button" class="icon-btn" aria-label="Vorheriges Foto" (click)="lr.run({ cmd: 'nav', value: 'prev' })"><cd-icon name="prev" /></button>
+        <div class="photo">
+          <span class="name">{{ photo()?.name || 'Kein Foto ausgewählt' }}</span>
+          <span class="meta">{{ state().module === 'develop' ? 'Entwickeln' : state().module === 'library' ? 'Bibliothek' : (state().module ?? '') }}</span>
+        </div>
+        <button type="button" class="icon-btn" aria-label="Nächstes Foto" (click)="lr.run({ cmd: 'nav', value: 'next' })"><cd-icon name="next" /></button>
+      </div>
+
+      @if (photo(); as p) {
+        <div class="rate" role="group" aria-label="Bewertung">
+          @for (n of stars; track n) {
+            <button type="button" class="star" [class.on]="n <= p.rating" [attr.aria-label]="n + ' Sterne'" (click)="setRating(n)"><cd-icon name="star" /></button>
+          }
+        </div>
+        <div class="flags">
+          <button type="button" class="chip" [class.on]="p.flag === 'pick'" (click)="setFlag('pick')" aria-label="Auswahl"><cd-icon name="flag" /><span class="t">Auswahl</span></button>
+          <button type="button" class="chip reject" [class.on]="p.flag === 'reject'" (click)="setFlag('reject')" aria-label="Abgelehnt"><cd-icon name="cross" /><span class="t">Abgelehnt</span></button>
+        </div>
+        <div class="labels" role="group" aria-label="Farbmarkierung">
+          @for (l of labels; track l.id) {
+            <button type="button" class="dot" [class.on]="p.label === l.id" [style.--c]="l.color" [attr.aria-label]="l.name" (click)="setLabel(l.id)"></button>
+          }
+        </div>
+      }
+
+      <div class="module seg">
+        <button type="button" [class.on]="state().module === 'library'" (click)="lr.run({ cmd: 'module', value: 'library' })">Bibliothek</button>
+        <button type="button" [class.on]="state().module === 'develop'" (click)="lr.run({ cmd: 'module', value: 'develop' })">Entwickeln</button>
+      </div>
+      <div class="undo">
+        <button type="button" class="icon-btn" aria-label="Rückgängig" (click)="lr.run({ cmd: 'undo' })"><cd-icon name="undo" /></button>
+        <button type="button" class="icon-btn" aria-label="Wiederholen" (click)="lr.run({ cmd: 'redo' })"><cd-icon name="redo" /></button>
+      </div>
+    </header>
+
+    <!-- Panels -->
+    <nav class="tabs" role="tablist">
+      @for (t of tabs; track t.id) {
+        <button type="button" role="tab" [class.on]="tab() === t.id" [attr.aria-selected]="tab() === t.id" (click)="tab.set(t.id)">{{ t.label }}</button>
+      }
+    </nav>
+
+    <section class="panel">
+      @if (tab() === 'presets') {
+        @if (lr.presets().length === 0) {
+          <p class="note">Keine Vorgaben gefunden. Lightroom liefert sie, sobald das Plugin verbunden ist.</p>
+        }
+        @for (f of lr.presets(); track f.name) {
+          <div class="folder">
+            <button type="button" class="folder-head" (click)="toggleFolder(f.name)">
+              <span>{{ openFolders().has(f.name) ? '▾' : '▸' }} {{ f.name }}</span><span class="count">{{ f.presets.length }}</span>
+            </button>
+            @if (openFolders().has(f.name)) {
+              <div class="presets">
+                @for (pr of f.presets; track pr.id) {
+                  <button type="button" class="preset" [disabled]="!photo()" (click)="lr.run({ cmd: 'preset', id: pr.id }, pr.name + ' angewendet.')">{{ pr.name }}</button>
+                }
+              </div>
+            }
+          </div>
+        }
+      } @else {
+        @if (!photo()) {
+          <p class="note">Kein Foto ausgewählt. In Lightroom ein Foto auswählen.</p>
+        } @else if (!lr.inDevelop()) {
+          <p class="note">Die Regler wirken im Modul Entwickeln.
+            <button type="button" class="link" (click)="lr.run({ cmd: 'module', value: 'develop' })">Zu Entwickeln wechseln</button></p>
+        }
+        @if (tab() === 'hsl') {
+          <div class="seg hsl-mode">
+            @for (m of ['Farbton', 'Sättigung', 'Luminanz']; track m) {
+              <button type="button" [class.on]="hslMode() === m" (click)="hslMode.set($any(m))">{{ m }}</button>
+            }
+          </div>
+        }
+        <div class="sliders">
+          @for (g of groups(); track g.name) {
+            <div class="group">
+              @if (g.name) { <h3>{{ g.name }}</h3> }
+              @for (d of g.params; track d.id) {
+                <cd-lr-slider [def]="d" [disabled]="!canEdit()" />
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- Schnellaktionen -->
+    <footer class="actions">
+      <button type="button" class="act" [disabled]="!photo()" (click)="lr.run({ cmd: 'auto', value: 'tone' })">Auto</button>
+      <button type="button" class="act" [disabled]="!photo()" (click)="lr.run({ cmd: 'auto', value: 'wb' })">Auto-WA</button>
+      <button type="button" class="act" [disabled]="!photo()" (click)="lr.run({ cmd: 'copy' }, 'Einstellungen kopiert.')">Kopieren</button>
+      <button type="button" class="act" [disabled]="!photo()" (click)="lr.run({ cmd: 'paste' }, 'Einstellungen eingefügt.')">Einfügen</button>
+      <button type="button" class="act" [class.on]="state().beforeAfter" (click)="lr.run({ cmd: 'beforeafter' })">Vorher/Nachher</button>
+      <button type="button" class="act" [disabled]="!photo()" (click)="lr.run({ cmd: 'tool', value: 'crop' })">Zuschneiden</button>
+      <button type="button" class="act" [disabled]="!photo()" (click)="lr.run({ cmd: 'tool', value: 'masking' })">Masken</button>
+      <button type="button" class="act" [disabled]="!photo()" (click)="resetAll()">Zurücksetzen</button>
+      <button type="button" class="act primary" [disabled]="!photo()" (click)="lr.run({ cmd: 'export' })">Exportieren</button>
+    </footer>
+  }
+</div>

@@ -5,6 +5,9 @@ import { LayoutService } from './layout.service';
 import { PlatformService } from './platform.service';
 
 export type Sheet = 'none' | 'about' | 'timer';
+/** Hauptansicht: Kacheln oder Lightroom. */
+export type MainView = 'deck' | 'lightroom';
+const VIEW_KEY = 'copperdeck.view';
 
 export interface Toast {
   readonly id: number;
@@ -23,6 +26,7 @@ export class DeckStore {
   readonly config = computed<DeckConfig>(() => this.conn.config() ?? EMPTY_CONFIG);
   readonly page = signal(0);
   readonly editMode = signal(false);
+  readonly view = signal<MainView>(readView());
   readonly sheet = signal<Sheet>('none');
   /** iPhone: Emoji-Leiste + Dock als Overlay. */
   readonly overlayOpen = signal(false);
@@ -68,6 +72,15 @@ export class DeckStore {
     this.editMode.set(true);
   }
 
+  /** Zwischen Kacheln und Lightroom wechseln (beendet den Bearbeitungsmodus). */
+  toggleLightroom(): void {
+    const next: MainView = this.view() === 'lightroom' ? 'deck' : 'lightroom';
+    this.editMode.set(false);
+    this.overlayOpen.set(false);
+    this.view.set(next);
+    try { localStorage.setItem(VIEW_KEY, next); } catch { /* privat */ }
+  }
+
   goTo(index: number): void {
     const max = this.pages().length - 1;
     this.page.set(Math.max(0, Math.min(max, index)));
@@ -75,3 +88,11 @@ export class DeckStore {
 }
 
 const EMPTY_CONFIG: DeckConfig = { schemaVersion: 1, revision: 0, groups: [], emojis: [], dock: [] };
+
+function readView(): MainView {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'lightroom' ? 'lightroom' : 'deck';
+  } catch {
+    return 'deck';
+  }
+}

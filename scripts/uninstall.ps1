@@ -24,6 +24,8 @@ if ($userPath) {
 }
 
 if (Test-Path $Runtime) { Remove-Item -Recurse -Force $Runtime; Write-Host "Entfernt: $Runtime" }
+$lrPlugin = Join-Path $env:APPDATA 'Adobe\Lightroom\Modules\CopperDeck.lrplugin'
+if (Test-Path $lrPlugin) { Remove-Item -Recurse -Force $lrPlugin; Write-Host "Lightroom-Plugin entfernt" }
 $shortcuts = Join-Path ([Environment]::GetFolderPath('Programs')) 'Copper Deck'
 if (Test-Path $shortcuts) { Write-Host "Mit add-app angelegte Verknüpfungen bleiben erhalten: $shortcuts" }
 

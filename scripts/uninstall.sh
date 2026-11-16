@@ -15,7 +15,7 @@ rm -f "$PLIST"
 pkill -f "copper-deck.mjs serve" 2>/dev/null || true
 
 echo "▶ Entferne App-Bundle, Laufzeitdateien und CLI"
-rm -rf "$APP_DST" "$DATA/runtime"
+rm -rf "$APP_DST" "$DATA/runtime" "$HOME/Library/Application Support/Adobe/Lightroom/Modules/CopperDeck.lrplugin"
 for d in /opt/homebrew/bin "$HOME/.local/bin"; do
   if [ -L "$d/copper-deck" ]; then rm -f "$d/copper-deck"; fi
 done

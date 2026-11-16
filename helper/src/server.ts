@@ -22,6 +22,8 @@ import type { PairingManager } from './pairing';
 import type { PermissionMonitor } from './permissions';
 import type { TimerManager } from './timer';
 import { PLATFORM } from './platform';
+import type { LightroomBridge } from './lightroom';
+import type { LrCommand } from '@copper-deck/shared';
 
 export interface ServerDeps {
   readonly devices: DeviceStore;
@@ -40,6 +42,10 @@ export interface ServerDeps {
   /** Wartezeit nach fehlgeschlagener Kopplung (bremst Raten). */
   readonly pairFailDelayMs?: number;
   readonly actionTimeoutMs?: number;
+  /** Verbindung zum Lightroom-Classic-Plugin (fehlt in Tests ohne Lightroom). */
+  readonly lightroom?: LightroomBridge;
+  /** "Mit vorherigen Einstellungen exportieren" (Tastenkombination in Lightroom). */
+  readonly lightroomExport?: () => Promise<RunResult>;
 }
 
 interface Session {
@@ -296,6 +302,10 @@ export function createServer(deps: ServerDeps) {
         send(ws, { type: 'timer', timer: deps.timers.get(), serverNow: Date.now() });
         send(ws, { type: 'permissions', permissions: deps.permissions.get() });
         void sendApps(ws);
+        if (deps.lightroom) {
+          send(ws, { type: 'lightroom', state: deps.lightroom.get() });
+          send(ws, { type: 'lrPresets', folders: deps.lightroom.getPresets() });
+        }
         return;
       }
       switch (parsed.type) {
@@ -307,6 +317,9 @@ export function createServer(deps: ServerDeps) {
           return;
         case 'saveConfig':
           void handleSave(ws, session, parsed.requestId, parsed.baseRevision, parsed.config);
+          return;
+        case 'lr':
+          void handleLightroom(ws, parsed.requestId, parsed.command as LrCommand);
           return;
         case 'auth':
           return; // bereits angemeldet
@@ -346,6 +359,22 @@ export function createServer(deps: ServerDeps) {
       clearTimeout(timer);
       session.inflight -= 1;
     }
+  }
+
+  async function handleLightroom(ws: WebSocket, requestId: string, command: LrCommand): Promise<void> {
+    if (command.cmd === 'export') {
+      const r = deps.lightroomExport ? await deps.lightroomExport() : { ok: false as const, message: 'Export ist nicht verfügbar.' };
+      send(ws, { type: 'lrResult', requestId, ok: r.ok, ...(r.message ? { message: r.message } : {}) });
+      return;
+    }
+    if (!deps.lightroom) {
+      send(ws, { type: 'lrResult', requestId, ok: false, message: 'Lightroom-Steuerung ist nicht aktiv.' });
+      return;
+    }
+    const r = await deps.lightroom.run(command);
+    // Reglerbewegungen nicht einzeln protokollieren (bis zu 20 pro Sekunde).
+    if (!r.ok || command.cmd !== 'set') log(r.ok ? 'info' : 'warn', 'Lightroom', { cmd: command.cmd, ok: r.ok, message: r.message });
+    send(ws, { type: 'lrResult', requestId, ok: r.ok, ...(r.message ? { message: r.message } : {}) });
   }
 
   /** Konfigurationsänderung: Revision + Schema + Bilder prüfen, atomar speichern, an alle senden. */
@@ -421,6 +450,8 @@ export function createServer(deps: ServerDeps) {
   };
   const unsubTimer = deps.timers.onChange((timer) => broadcast({ type: 'timer', timer, serverNow: Date.now() }));
   const unsubPerm = deps.permissions.onChange((permissions) => broadcast({ type: 'permissions', permissions }));
+  const unsubLr = deps.lightroom?.onState((state) => broadcast({ type: 'lightroom', state }));
+  const unsubLrPresets = deps.lightroom?.onPresets((folders) => broadcast({ type: 'lrPresets', folders }));
 
   // Tote Verbindungen erkennen (iOS trennt im Hintergrund oft ohne Close-Frame)
   const heartbeat = setInterval(() => {
@@ -444,6 +475,8 @@ export function createServer(deps: ServerDeps) {
       unsubscribe();
       unsubTimer();
       unsubPerm();
+      unsubLr?.();
+      unsubLrPresets?.();
       for (const ws of sockets.keys()) ws.terminate();
       wss.close();
       const closed = new Promise<void>((r) => server.close(() => r()));

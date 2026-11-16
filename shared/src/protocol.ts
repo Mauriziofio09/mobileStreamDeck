@@ -1,4 +1,5 @@
 import type { DeckConfig, HostPlatform, InstalledApp } from './config';
+import type { LrCommand, LrPresetFolder, LrState } from './lightroom';
 
 /**
  * WebSocket-Protokoll zwischen PWA und Helper.
@@ -17,7 +18,9 @@ export type ClientMessage =
   | { readonly type: 'run'; readonly requestId: string; readonly actionId: string }
   | { readonly type: 'ping'; readonly t: number }
   /** Konfigurationsänderung; basiert auf baseRevision (sonst Ablehnung als veraltet). */
-  | { readonly type: 'saveConfig'; readonly requestId: string; readonly baseRevision: number; readonly config: DeckConfig };
+  | { readonly type: 'saveConfig'; readonly requestId: string; readonly baseRevision: number; readonly config: DeckConfig }
+  /** Lightroom Classic steuern (nur feste Befehle und Regler aus LR_PARAMS). */
+  | { readonly type: 'lr'; readonly requestId: string; readonly command: LrCommand };
 
 export type SaveRejectReason = 'stale' | 'invalid';
 
@@ -86,6 +89,9 @@ export type ServerMessage =
   /** Laufender Timer (Endzeit vom Helper) + Serverzeit zur Uhrkorrektur. */
   | { readonly type: 'timer'; readonly timer: TimerState | null; readonly serverNow: number }
   | { readonly type: 'permissions'; readonly permissions: PermissionState }
+  | { readonly type: 'lightroom'; readonly state: LrState }
+  | { readonly type: 'lrPresets'; readonly folders: readonly LrPresetFolder[] }
+  | { readonly type: 'lrResult'; readonly requestId: string; readonly ok: boolean; readonly message?: string }
   | { readonly type: 'saveResult'; readonly requestId: string; readonly ok: true; readonly revision: number }
   | { readonly type: 'saveResult'; readonly requestId: string; readonly ok: false; readonly reason: SaveRejectReason; readonly message: string; readonly issues?: readonly string[] };
 

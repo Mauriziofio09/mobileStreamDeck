@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { CONFIG_SCHEMA_VERSION, HOTKEY_KEYS, MODIFIERS, TILES_PER_GROUP } from './config';
 import { ID_PATTERN } from './protocol';
+import { LR_PARAM_IDS } from './lightroom';
 
 const id = z.string().regex(ID_PATTERN);
 /** IDs in der Konfiguration: "sys-" ist für feste System-Aktionen reserviert. */
@@ -96,12 +97,30 @@ export const deckConfigSchema = z
     }
   });
 
+const lrParam = z.string().refine((v) => LR_PARAM_IDS.includes(v), 'Unbekannter Regler');
+
+/** Lightroom-Befehle: feste Liste; Werte als endliche Zahlen (den Bereich prüft Lightroom). */
+export const lrCommandSchema = z.discriminatedUnion('cmd', [
+  z.object({ cmd: z.literal('set'), param: lrParam, value: z.number().finite().min(-100000).max(100000) }).strict(),
+  z.object({ cmd: z.enum(['inc', 'dec', 'reset']), param: lrParam }).strict(),
+  z.object({ cmd: z.literal('rating'), value: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]) }).strict(),
+  z.object({ cmd: z.literal('flag'), value: z.enum(['pick', 'reject', 'none']) }).strict(),
+  z.object({ cmd: z.literal('label'), value: z.enum(['red', 'yellow', 'green', 'blue', 'purple', 'none']) }).strict(),
+  z.object({ cmd: z.literal('nav'), value: z.enum(['next', 'prev']) }).strict(),
+  z.object({ cmd: z.literal('module'), value: z.enum(['library', 'develop']) }).strict(),
+  z.object({ cmd: z.literal('tool'), value: z.enum(['loupe', 'crop', 'dust', 'redeye', 'masking']) }).strict(),
+  z.object({ cmd: z.literal('auto'), value: z.enum(['tone', 'wb']) }).strict(),
+  z.object({ cmd: z.literal('preset'), id: z.string().regex(/^[A-Za-z0-9-]{1,64}$/) }).strict(),
+  z.object({ cmd: z.enum(['copy', 'paste', 'undo', 'redo', 'beforeafter', 'resetall', 'presets', 'export']) }).strict(),
+]);
+
 export const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('auth'), token: z.string().min(20).max(200), protocol: z.number().int() }).strict(),
   z.object({ type: z.literal('run'), requestId: id, actionId: id }).strict(),
   z.object({ type: z.literal('ping'), t: z.number() }).strict(),
   // Inhalt wird im Helper gegen deckConfigSchema geprüft (mit verständlichen Fehlermeldungen).
   z.object({ type: z.literal('saveConfig'), requestId: id, baseRevision: z.number().int().nonnegative(), config: z.unknown() }).strict(),
+  z.object({ type: z.literal('lr'), requestId: id, command: lrCommandSchema }).strict(),
 ]);
 
 export const pairRequestSchema = z.object({

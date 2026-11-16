@@ -20,6 +20,7 @@ import { Native, resolveNativeBinary, resolveScript } from './native';
 import { MediaStore } from './media';
 import { PermissionMonitor } from './permissions';
 import { createServer } from './server';
+import { LightroomBridge } from './lightroom';
 import { TimerManager } from './timer';
 import { actionSchema } from '@copper-deck/shared/schema';
 import { access, writeFile } from 'node:fs/promises';
@@ -93,8 +94,23 @@ async function serve(): Promise<void> {
         if (!r.ok) throw new Error(String(r.error ?? 'convert-image fehlgeschlagen'));
       })
     : new MediaStore(path.join(paths.data, 'media'), execFileSafe);
+  // Lightroom Classic: Plugin-Verbindung (wartet still, bis Lightroom mit dem Plugin läuft).
+  const lightroom = new LightroomBridge();
+  lightroom.start();
+  const lightroomExport = async () => {
+    // "Mit vorherigen Einstellungen exportieren": Lightroom nach vorne holen, dann die Standard-Tastenkombination.
+    const app = IS_WINDOWS
+      ? (await catalog.list()).find((a) => /lightroom classic/i.test(a.name))
+      : await catalog.get('com.adobe.LightroomClassicCC7');
+    if (!app) return { ok: false as const, code: 'app_not_found' as const, message: 'Lightroom Classic ist nicht installiert.' };
+    const opened = await runner.run({ type: 'openApp', bundleId: app.bundleId });
+    if (!opened.ok) return opened;
+    await new Promise((r) => setTimeout(r, 600));
+    const r = await runner.run({ type: 'hotkey', modifiers: [IS_WINDOWS ? 'control' : 'command', 'option', 'shift'], key: 'e' });
+    return r.ok ? { ok: true as const, message: 'Export mit vorherigen Einstellungen gestartet.' } : r;
+  };
   const srv = createServer({
-    devices, pairing, config, catalog, runner, timers, permissions,
+    devices, pairing, config, catalog, runner, timers, permissions, lightroom, lightroomExport,
     media,
     origins, webRoot, tls: await readTls(), version: VERSION,
   });
@@ -154,6 +170,7 @@ async function serve(): Promise<void> {
     log('info', `Beende (${sig})`);
     // Admin-Socket zuerst schliessen, damit ein Nachfolger sofort starten kann.
     admin.close();
+    lightroom.stop();
     void (IS_WINDOWS ? Promise.resolve() : rm(paths.adminSocket, { force: true }))
       .then(() => srv.close())
       .finally(() => process.exit(0));

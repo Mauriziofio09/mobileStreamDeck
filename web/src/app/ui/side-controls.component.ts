@@ -40,7 +40,12 @@ import { IconComponent } from './icons';
         <span class="seg-icon about-icon"><cd-icon name="info" /><span class="conn" [attr.data-state]="permMissing() ? 'perm' : conn.state()"></span></span>
         <span class="seg-label">About</span>
       </button>
-      <button type="button" class="seg" [class.active]="store.barActive()" (click)="store.toggleBar()">
+      <button type="button" class="seg" [class.active]="store.view() === 'lightroom'" aria-label="Lightroom" (click)="store.toggleLightroom()">
+        @if (store.view() === 'lightroom') { <span class="seg-bg" cdSurface="segment" [cdRadius]="0.5"></span> }
+        <span class="seg-icon lr-icon"><cd-icon name="aperture" />@if (lrConnected()) { <span class="lr-dot"></span> }</span>
+        <span class="seg-label">LR</span>
+      </button>
+      <button type="button" class="seg" [class.active]="store.barActive()" [disabled]="store.view() === 'lightroom'" (click)="store.toggleBar()">
         @if (store.barActive()) { <span class="seg-bg" cdSurface="segment" [cdRadius]="0.5"></span> }
         <span class="seg-icon"><cd-icon name="grid" /></span>
         <span class="seg-label">Bar</span>
@@ -59,4 +64,5 @@ export class SideControlsComponent {
     return !!p && (p.accessibility !== 'granted' || p.automation !== 'granted' || p.notifications !== 'granted');
   });
   protected readonly vertical = computed(() => this.layout.layout().controls === 'side');
+  protected readonly lrConnected = computed(() => this.conn.lightroom().connected);
 }

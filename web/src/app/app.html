@@ -2,6 +2,10 @@
 
 @if (view() === 'deck') {
 
+@if (store.view() === 'lightroom') {
+  <cd-lightroom />
+} @else {
+
 @if (layout().barMode === 'inline' && layoutService.barVisible()) {
   <cd-emoji-bar class="top-bar" />
 }
@@ -14,7 +18,9 @@
   <cd-dock class="dock" />
 }
 
-@if (layout().device === 'phone' && layout().orientation === 'landscape') {
+}
+
+@if (layout().device === 'phone' && layout().orientation === 'landscape' && store.view() === 'deck') {
   <button type="button" class="grabber" data-no-swipe aria-label="Bar öffnen" (click)="store.toggleBar()"></button>
 }
 

@@ -70,6 +70,14 @@ rm -rf "$RUNTIME.old"; [ -d "$RUNTIME" ] && mv "$RUNTIME" "$RUNTIME.old"
 mv "$RUNTIME.new" "$RUNTIME"; rm -rf "$RUNTIME.old"
 ok "Laufzeitdateien bereit"
 
+# --- Lightroom-Classic-Plugin ----------------------------------------------
+# Plugins im Modules-Ordner lädt Lightroom Classic beim Start automatisch (kein Zusatzmodul-Manager nötig).
+LR_MODULES="$HOME/Library/Application Support/Adobe/Lightroom/Modules"
+mkdir -p "$LR_MODULES"
+rm -rf "$LR_MODULES/CopperDeck.lrplugin"
+cp -R "$REPO/lightroom/CopperDeck.lrplugin" "$LR_MODULES/"
+ok "Lightroom-Plugin: $LR_MODULES/CopperDeck.lrplugin (wirkt nach einem Neustart von Lightroom Classic)"
+
 # --- CLI -------------------------------------------------------------------
 if [ -w /opt/homebrew/bin ]; then CLI_DIR=/opt/homebrew/bin; else CLI_DIR="$HOME/.local/bin"; mkdir -p "$CLI_DIR"; fi
 ln -sf "$RUNTIME/bin/copper-deck" "$CLI_DIR/copper-deck"

@@ -85,3 +85,8 @@
 }
 .conn[data-state='online'] { background: var(--c-ok); }
 .conn[data-state='perm'] { background: var(--c-err); }
+
+/* Lightroom-Segment: grüner Punkt, wenn Lightroom Classic verbunden ist */
+.lr-icon { position: relative; }
+.lr-dot { position: absolute; right: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--c-ok, #46a758); }
+.seg:disabled { opacity: 0.35; }

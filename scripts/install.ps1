@@ -91,6 +91,15 @@ if (Test-Path $Runtime) { Remove-Item -Recurse -Force $Runtime }
 Move-Item $Staging $Runtime
 Ok 'Laufzeitdateien bereit'
 
+# --- Lightroom-Classic-Plugin ------------------------------------------------
+# Plugins im Modules-Ordner lädt Lightroom Classic beim Start automatisch.
+$lrModules = Join-Path $env:APPDATA 'Adobe\Lightroom\Modules'
+New-Item -ItemType Directory -Force -Path $lrModules | Out-Null
+$lrPlugin = Join-Path $lrModules 'CopperDeck.lrplugin'
+if (Test-Path $lrPlugin) { Remove-Item -Recurse -Force $lrPlugin }
+Copy-Item -Recurse (Join-Path $Repo 'lightroom\CopperDeck.lrplugin') $lrModules
+Ok "Lightroom-Plugin: $lrPlugin (wirkt nach einem Neustart von Lightroom Classic)"
+
 # --- CLI im PATH -------------------------------------------------------------
 $binDir = Join-Path $Runtime 'bin'
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')

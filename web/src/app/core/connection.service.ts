@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import {
-  CLOSE, PROTOCOL_VERSION, WS_PATH,
-  type ClientMessage, type DeckConfig, type InstalledApp, type PermissionKind, type PermissionState, type ServerMessage, type TimerState,
+  CLOSE, LR_EMPTY_STATE, PROTOCOL_VERSION, WS_PATH,
+  type ClientMessage, type LrCommand, type LrPresetFolder, type LrState, type DeckConfig, type InstalledApp, type PermissionKind, type PermissionState, type ServerMessage, type TimerState,
 } from '@copper-deck/shared';
 import { AuthService } from './auth.service';
 import { PlatformService } from './platform.service';
@@ -53,6 +53,9 @@ export class ConnectionService {
   /** Serverzeit minus lokale Zeit: alle Geräte zeigen denselben Countdown. */
   readonly clockOffset = signal(0);
   readonly permissions = signal<PermissionState | null>(null);
+  /** Lightroom Classic (über das Plugin am Mac/PC). */
+  readonly lightroom = signal<LrState>(LR_EMPTY_STATE);
+  readonly lrPresets = signal<readonly LrPresetFolder[]>([]);
   /** Letzte vom Helper bestätigte Revision (Basis für Änderungen). */
   readonly serverRevision = signal<number>(this.config()?.revision ?? 0);
   /** Zuletzt vom Helper bestätigte Konfiguration (zum Zurücksetzen bei Ablehnung). */
@@ -65,6 +68,7 @@ export class ConnectionService {
   private pongTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly pending = new Map<string, Pending>();
   private readonly pendingSaves = new Map<string, PendingSave>();
+  private readonly pendingLr = new Map<string, { resolve: (r: { ok: boolean; message?: string }) => void; timer: ReturnType<typeof setTimeout> }>();
 
   constructor() {
     document.addEventListener('visibilitychange', () => {
@@ -114,6 +118,22 @@ export class ConnectionService {
       }, REQUEST_TIMEOUT_MS);
       this.pending.set(requestId, { resolve, timer });
       this.sendRaw({ type: 'run', requestId, actionId });
+    });
+  }
+
+  /** Lightroom-Befehl; Antwort vom Plugin (über den Helper) oder Zeitüberschreitung. */
+  lr(command: LrCommand): Promise<{ ok: boolean; message?: string }> {
+    if (this.state() !== 'online' || !this.ws) {
+      return Promise.resolve({ ok: false, message: `Keine Verbindung zum ${this.platform.host()}.` });
+    }
+    const requestId = crypto.randomUUID();
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.pendingLr.delete(requestId);
+        resolve({ ok: false, message: 'Keine Antwort von Lightroom (Zeitüberschreitung).' });
+      }, REQUEST_TIMEOUT_MS);
+      this.pendingLr.set(requestId, { resolve, timer });
+      this.sendRaw({ type: 'lr', requestId, command });
     });
   }
 
@@ -195,6 +215,20 @@ export class ConnectionService {
       case 'permissions':
         this.permissions.set(msg.permissions);
         return;
+      case 'lightroom':
+        this.lightroom.set(msg.state);
+        return;
+      case 'lrPresets':
+        this.lrPresets.set(msg.folders);
+        return;
+      case 'lrResult': {
+        const p = this.pendingLr.get(msg.requestId);
+        if (!p) return;
+        clearTimeout(p.timer);
+        this.pendingLr.delete(msg.requestId);
+        p.resolve(msg.ok ? { ok: true } : { ok: false, ...(msg.message ? { message: msg.message } : {}) });
+        return;
+      }
       case 'pong':
         if (this.pongTimer) clearTimeout(this.pongTimer);
         this.pongTimer = null;
@@ -281,7 +315,13 @@ export class ConnectionService {
       clearTimeout(p.timer);
       p.resolve({ ok: false, kind: 'interrupted', reason: 'Verbindung unterbrochen – Ergebnis unbekannt.' });
       this.pending.delete(id);
+    }    for (const [id, p] of this.pendingLr) {
+      clearTimeout(p.timer);
+      p.resolve({ ok: false, message: 'Verbindung unterbrochen.' });
+      this.pendingLr.delete(id);
     }
+    // Lightroom-Zustand ist ohne Verbindung unbekannt.
+    this.lightroom.set(LR_EMPTY_STATE);
   }
 
   private teardown(): void {

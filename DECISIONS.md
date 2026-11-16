@@ -334,3 +334,32 @@ Hier steht, was ich selbst entschieden habe. Neue Einträge kommen jeweils unten
 ### Getestet und nicht getestet
 - **Getestet (auf dem Mac):** 15 neue Unit-Tests mit nachgebildetem Windows (Katalog, Icon-Cache, Aktionen, Fehlertexte, Startbelegung, ID-Prüfung); alle 48 Tests grün. App im Windows-Modus per Playwright angesehen. Mac-Regressionstest (`e2e-bar.mjs`) grün.
 - **Nicht getestet:** `CopperDeckHelper.cs` ist **nicht kompiliert**: Auf diesem Mac gibt es keinen C#-Compiler, und das Herunterladen eines .NET-SDK in den temporären Ordner wurde von der Rechteprüfung abgelehnt. `install.ps1` ist **nicht ausgeführt** (kein PowerShell hier). Beides ist der erste Schritt der Testcheckliste am PC.
+
+## Meilenstein 7 – Lightroom-Classic-Tab (Version 0.8.0)
+
+### Warum ein Plugin
+- Nur **Lightroom Classic** hat eine Plugin-Schnittstelle (Lua-SDK), über die sich Regler wirklich auf Werte setzen lassen (`LrDevelopController`). Tastenkombinationen allein könnten das nicht.
+- **Ein Plugin für Mac und Windows** (`lightroom/CopperDeck.lrplugin`, reines Lua, keine nativen Teile). Die Installationsskripte legen es in den **Modules**-Ordner, den Lightroom beim Start automatisch lädt. So muss man nichts im Zusatzmodul-Manager hinzufügen.
+
+### Verbindung
+- Das Plugin öffnet mit `LrSocket` zwei **lokale** Ports (47801 empfangen, 47802 senden; LrSocket kann pro Socket nur eine Richtung). Der Helper verbindet sich als Client und versucht es alle 2 s erneut. So ist es egal, ob Lightroom oder der Helper zuerst startet.
+- **Format:** Helper → Plugin eine Tabulator-getrennte Zeile (`id, befehl, argumente`), Plugin → Helper eine JSON-Zeile. Lua in Lightroom hat keinen JSON-Leser; die einfache Zeile genügt für die festen Befehle. JSON schreibt das Plugin mit einem eigenen kleinen Encoder.
+- **Zustand:** Das Plugin prüft alle 250 ms Foto, Modul und (im Entwickeln-Modul) die Reglerwerte und meldet nur Änderungen. Damit folgt die App auch Änderungen, die am Rechner gemacht werden.
+- **Bereiche:** Temperatur und Tönung haben je nach Foto andere Bereiche (Raw: Kelvin, JPEG: −100…100). Das Plugin meldet den echten Bereich; die App rechnet damit.
+
+### Bedienung
+- **Eigener Tab** statt Kacheln: Der Bildschirm wechselt zwischen Kacheln und Lightroom (Segment „LR“ in der Pille, grüner Punkt = verbunden). Emoji-Leiste und Dock sind im Lightroom-Tab ausgeblendet, damit die Regler Platz haben.
+- **Regler:** relatives Ziehen (kein Sprung beim Antippen), Feinmodus über senkrechten Abstand wie das Scrubbing in iOS, −/+ mit der Schrittweite von Lightroom (`increment`/`decrement`), Doppeltippen = Standardwert.
+- **Drosselung:** Pro Regler ist höchstens ein Wert unterwegs; während er auf Antwort wartet, wird nur der neueste vorgemerkt. Das hält Lightroom flüssig, ohne Werte aufzustauen. Nach dem Loslassen gilt der eigene Wert noch 0,9 s, damit verspätete Meldungen den Regler nicht zurückspringen lassen.
+- **Regler-Befehle wechseln automatisch ins Entwickeln-Modul**, weil `LrDevelopController` nur dort wirkt. In der Bibliothek zeigt die App die Regler gesperrt mit Knopf „Zu Entwickeln wechseln“ (die Werte sind dort nicht lesbar).
+- **Exportieren:** Das SDK kann „Mit vorherigen Einstellungen exportieren“ nicht direkt auslösen. Der Helper holt Lightroom nach vorne und sendet die Standard-Tastenkombination (⌘⌥⇧E bzw. Strg+Alt+Umschalt+E). So gelten deine eigenen Exporteinstellungen.
+- **Zurücksetzen** braucht wie das Löschen ein zweites Tippen.
+- **Zahlenformat de-CH:** Dezimalpunkt (+0.35), wie Lightroom mit Schweizer Einstellungen.
+
+### Sicherheit
+- Feste Liste von 64 Reglern und 20 Befehlen; der Helper prüft mit zod, das Plugin prüft noch einmal. Ein Test vergleicht die Reglerliste in `Protocol.lua` mit der in `shared/src/lightroom.ts`.
+- Vorgaben werden nur per UUID angewendet, die das Plugin selbst geliefert hat.
+
+### Getestet und nicht getestet
+- **Getestet:** Brücke im Helper gegen ein nachgebildetes Plugin über echte TCP-Verbindungen (7 Unit-Tests: Verbindung, Filter, Antworten, Abbruch, Wiederverbinden, Befehlsprüfung, Listenabgleich). Ende-zu-Ende mit iPad und iPhone gegen den Helper unter launchd und `tools/fake-lightroom.mjs` (23 Prüfungen, inkl. Live-Sync und Trennen).
+- **Nicht getestet:** Das Lua-Plugin selbst. Lightroom Classic ist auf diesem Mac nicht installiert, und weder ein Lua-Interpreter noch fengari (Lua in JavaScript) durften installiert werden. Erster Punkt der Testcheckliste.
