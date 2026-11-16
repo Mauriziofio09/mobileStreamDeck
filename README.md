@@ -27,6 +27,7 @@ iPhone / iPad (PWA, Vollbild)  ──WSS/HTTPS im WLAN──▶  Copper Deck Hel
 17. [Entwicklung](#17-entwicklung)
 18. [Windows](#18-windows)
 19. [Lightroom Classic](#19-lightroom-classic)
+20. [Unterwegs mit Tailscale](#20-unterwegs-mit-tailscale)
 
 ---
 
@@ -220,6 +221,7 @@ sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp "$NODE_BIN"
 | `copper-deck cert [--renew]` | TLS-Zertifikat prüfen bzw. erneuern |
 | `copper-deck cert-status` | Zertifikatsdetails |
 | `copper-deck ca` | mkcert-Root-CA im Finder zeigen (für AirDrop) |
+| `copper-deck tailscale` | Adresse und Zertifikat für unterwegs (Tailscale) |
 
 **LaunchAgent**
 
@@ -455,4 +457,28 @@ Der Tab **LR** (Pille rechts bzw. unten) macht iPhone und iPad zu einem Bedienpu
 - **Exportieren macht nichts:** Lightroom braucht dafür einmal einen normalen Export (die „vorherigen Einstellungen“). Auf dem Mac sind Bedienungshilfen für „Copper Deck Helper“ nötig.
 - **Port belegt:** Ein anderes Programm nutzt 47801/47802 (sehr selten). Dann im Helper-Log nachsehen.
 - Für Entwicklung ohne Lightroom: `node tools/fake-lightroom.mjs` simuliert das Plugin.
+
+## 20. Unterwegs mit Tailscale
+
+Im selben WLAN verbindet sich das iPhone direkt mit dem Mac/PC. In Netzen, die Geräte voneinander trennen (Firmen- und Gäste-WLANs), und über Mobilfunk geht das nicht. Dafür gibt es **Tailscale**: ein verschlüsseltes privates Netz zwischen deinen eigenen Geräten. Die Verbindung läuft fast immer **direkt** von Gerät zu Gerät; nur wenn ein Netz das komplett verhindert, leitet Tailscale verschlüsselt über einen eigenen Relay-Server weiter.
+
+### Einrichtung
+1. **Tailscale** auf Mac/PC und iPhone/iPad installieren (https://tailscale.com/download, iOS: App Store) und mit **demselben Konto** anmelden.
+2. Im Tailscale-Admin (login.tailscale.com → **DNS**) **MagicDNS** und **HTTPS Certificates** aktivieren.
+3. Helper neu starten oder bis zu 10 Minuten warten. `copper-deck tailscale` zeigt die Adresse, z. B. `https://copperdeck-mac.<tailnet>.ts.net:7443`.
+4. Auf dem iPhone in **Safari** diese Adresse öffnen → Teilen → **Zum Home-Bildschirm** → mit `copper-deck pair` koppeln. Diese App funktioniert dann zuhause, im Firmen-WLAN und über Mobilfunk, solange Tailscale auf dem iPhone aktiv ist.
+
+> iOS behandelt jede Adresse als eigene App mit eigener Kopplung. Die `.local`-App kann bleiben (nur im selben WLAN); die Tailscale-App ist die, die überall geht.
+
+### Zertifikat
+- Der Helper holt für die Tailscale-Adresse ein **echtes Zertifikat** (Let's Encrypt über `tailscale cert`) und erneuert es von selbst. Dann braucht das iPhone **kein mkcert-Profil**.
+- **Bis es da ist**, gilt das mkcert-Zertifikat (es enthält den Tailscale-Namen ebenfalls). Netze, die verschlüsselte Verbindungen mitlesen (z. B. Swisscom SecurePOP im Firmen-WLAN), verhindern das Holen; der Helper versucht es alle 10 Minuten erneut und klappt in einem anderen Netz (Hotspot, zuhause).
+- **Name:** Zertifikate von Let's Encrypt sind öffentlich einsehbar (Certificate-Transparency-Logs). Der Mac heisst in Tailscale deshalb neutral `copperdeck-mac` statt mit deinem Namen. Ändern: `tailscale set --hostname=<name>`.
+- Der Helper nimmt Verbindungen weiterhin nur von gekoppelten Geräten an; erreichbar ist er über Tailscale nur für Geräte in deinem eigenen Tailnet.
+
+### Fehlerbehebung Tailscale
+- **`copper-deck tailscale`: „nicht verbunden“:** Tailscale-App öffnen und anmelden.
+- **„HTTPS im Tailscale-Netz aktivieren“:** login.tailscale.com → DNS → HTTPS Certificates.
+- **Seite lädt unterwegs nicht:** Ist Tailscale auf dem iPhone eingeschaltet (VPN-Symbol)? `tailscale ping copperdeck-mac` am iPhone bzw. in der Tailscale-App prüfen.
+- **macOS:** Die Tailscale-App ist zugleich die CLI; der Helper ruft sie mit `TAILSCALE_BE_CLI=1` auf, sonst versucht sie unter launchd ihr Fenster zu öffnen.
 

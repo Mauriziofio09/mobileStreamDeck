@@ -80,7 +80,7 @@ export const SYSTEM_ACTIONS = [
 export type SystemActionId = (typeof SYSTEM_ACTIONS)[number];
 
 export type ServerMessage =
-  | { readonly type: 'ready'; readonly deviceId: string; readonly deviceName: string; readonly protocol: number; readonly helperVersion: string; readonly platform: HostPlatform }
+  | { readonly type: 'ready'; readonly deviceId: string; readonly deviceName: string; readonly protocol: number; readonly helperVersion: string; readonly platform: HostPlatform; readonly tailscaleUrl?: string | null }
   | { readonly type: 'config'; readonly config: DeckConfig }
   /** Installierte Apps, die in der Konfiguration vorkommen (für "nicht verfügbar"). */
   | { readonly type: 'apps'; readonly apps: readonly InstalledApp[] }

@@ -47,6 +47,8 @@ export class ConnectionService {
   readonly apps = signal<readonly InstalledApp[] | null>(null);
   readonly deviceName = signal<string>('');
   readonly helperVersion = signal<string>('');
+  /** Adresse über Tailscale (unterwegs), falls der Helper eine hat. */
+  readonly tailscaleUrl = signal<string | null>(null);
   readonly lastError = signal<string | null>(null);
   readonly attempt = signal(0);
   readonly timer = signal<TimerState | null>(null);
@@ -188,6 +190,7 @@ export class ConnectionService {
         this.deviceName.set(msg.deviceName);
         this.helperVersion.set(msg.helperVersion);
         if (msg.platform) this.platform.set(msg.platform);
+        this.tailscaleUrl.set(msg.tailscaleUrl ?? null);
         this.startHeartbeat();
         return;
       case 'config':

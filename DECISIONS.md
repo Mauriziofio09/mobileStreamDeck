@@ -363,3 +363,22 @@ Hier steht, was ich selbst entschieden habe. Neue Einträge kommen jeweils unten
 ### Getestet und nicht getestet
 - **Getestet:** Brücke im Helper gegen ein nachgebildetes Plugin über echte TCP-Verbindungen (7 Unit-Tests: Verbindung, Filter, Antworten, Abbruch, Wiederverbinden, Befehlsprüfung, Listenabgleich). Ende-zu-Ende mit iPad und iPhone gegen den Helper unter launchd und `tools/fake-lightroom.mjs` (23 Prüfungen, inkl. Live-Sync und Trennen).
 - **Nicht getestet:** Das Lua-Plugin selbst. Lightroom Classic ist auf diesem Mac nicht installiert, und weder ein Lua-Interpreter noch fengari (Lua in JavaScript) durften installiert werden. Erster Punkt der Testcheckliste.
+
+## Meilenstein 8 – Unterwegs mit Tailscale (Version 0.9.0)
+
+### Warum Tailscale statt eigenem Server
+- Deine Vorgabe: Das Handy soll sich **immer direkt** mit dem Laptop verbinden. Ein Server, der nur die Web-App ausliefert, hilft in isolierenden Netzen nicht (die Verbindung zum Laptop wäre dort genauso blockiert), und ein Relais über den Server wäre nicht direkt.
+- Tailscale verbindet deine Geräte über WireGuard und durchdringt NAT/Firmennetze meist **direkt**; nur wenn das nicht geht, über einen Tailscale-Relay (weiterhin Ende-zu-Ende verschlüsselt). Du hast dem zugestimmt. Ein eigener Server ist damit nicht nötig.
+
+### Umsetzung
+- Der Helper erkennt Tailscale (macOS: App-Bundle bzw. Homebrew-CLI, Windows: `tailscale.exe`), liest `tailscale status --json` und nimmt `https://<name>.ts.net:7443` als **zusätzliche** erlaubte Adresse auf. Lokal bleibt alles wie bisher; Tailscale ist optional.
+- **Zwei Zertifikate über SNI** auf demselben Port: `*.ts.net` bekommt das echte Let's-Encrypt-Zertifikat von `tailscale cert`, alles andere das mkcert-Zertifikat. Das Tailscale-Zertifikat kommt über stdout (`--cert-file - --key-file -`), weil die App-Store-Version von Tailscale nicht in beliebige Ordner schreiben darf.
+- **Rückfall:** Bis das echte Zertifikat da ist, enthält das mkcert-Zertifikat auch den Tailscale-Namen. Geräte mit mkcert-Profil können die Tailscale-Adresse also sofort nutzen.
+- **Erneuerung:** Prüfung alle 10 Minuten (Name und Zertifikat), neues Zertifikat erst unter 30 Tagen Restlaufzeit. Tailscale-Namensänderungen übernimmt der Helper ohne Neustart (erlaubte Adressen werden bei jeder Anfrage neu gelesen).
+- **macOS-Eigenheit:** Die Tailscale-App ist zugleich die CLI. Unter launchd (ohne Terminal) versucht sie, ihr Fenster zu starten („The Tailscale GUI failed to start“). `TAILSCALE_BE_CLI=1` erzwingt den CLI-Modus. Gefunden und behoben beim Test unter launchd.
+- **Neutraler Name:** Let's-Encrypt-Zertifikate stehen öffentlich in den Certificate-Transparency-Logs. Auf deinen Wunsch habe ich den Mac in Tailscale in `copperdeck-mac` umbenannt (`tailscale set --hostname`); der Mac-Name selbst ist unverändert.
+- **Anzeige:** About zeigt die Tailscale-Adresse („Unterwegs“); `copper-deck pair` und `copper-deck status` nennen sie ebenfalls; neu `copper-deck tailscale`.
+
+### Getestet und offen
+- **Getestet:** 7 Unit-Tests (Status lesen, Namensprüfung, stdout aufteilen, Zertifikat holen/speichern/nicht unnötig erneuern, Fehlererklärung, SNI mit zwei Zertifikaten). Unter launchd: Tailscale-Adresse erkannt, Rückfall-Zertifikat mit ts.net-Namen, `https://copperdeck-mac.tailf11a59.ts.net:7443` antwortet.
+- **Offen:** Das echte Zertifikat konnte ich nicht holen. Im KTLU-Netz liest „Swisscom SecurePOP“ verschlüsselte Verbindungen mit, Let's Encrypt ist so nicht prüfbar. Auch der Tailscale-Relay ist von dort nicht erreichbar. Ob iPhone und Mac sich im KTLU-WLAN über Tailscale direkt finden, muss der Test am iPhone zeigen; über den Hotspot oder Mobilfunk sollte es gehen.

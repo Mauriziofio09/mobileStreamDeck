@@ -34,8 +34,12 @@ export interface ServerDeps {
   readonly timers: TimerManager;
   readonly permissions: PermissionMonitor;
   readonly media: MediaStore;
-  /** Erlaubte Origins, z. B. https://macbook-pro-von-maurizio.local:7443 */
+  /** Erlaubte Origins, z. B. https://macbook-pro-von-maurizio.local:7443 (darf sich zur Laufzeit ändern, z. B. Tailscale). */
   readonly origins: readonly string[];
+  /** Zertifikat je Servername (SNI), z. B. das echte Tailscale-Zertifikat für *.ts.net; sonst gilt `tls`. */
+  /** Adresse über Tailscale (für die Anzeige in About), falls vorhanden. */
+  readonly tailscaleUrl?: () => string | null;
+  readonly sniContext?: (servername: string) => import('node:tls').SecureContext | undefined;
   readonly webRoot: string;
   readonly tls: { key: string | Buffer; cert: string | Buffer };
   readonly version: string;
@@ -59,8 +63,8 @@ const HEARTBEAT_MS = 20_000;
 const MAX_INFLIGHT = 4;
 
 export function createServer(deps: ServerDeps) {
-  const allowed = new Set(deps.origins.map((o) => o.toLowerCase()));
-  const originOk = (origin: string | undefined): boolean => !!origin && allowed.has(origin.toLowerCase());
+  // Bei jeder Prüfung neu lesen: Tailscale-Adressen kommen evtl. erst nach dem Start dazu.
+  const originOk = (origin: string | undefined): boolean => !!origin && deps.origins.some((o) => o.toLowerCase() === origin.toLowerCase());
   const sockets = new Map<WebSocket, Session>();
 
   // ---------- HTTP ----------
@@ -249,7 +253,10 @@ export function createServer(deps: ServerDeps) {
     if (!res.headersSent) res.status(err.status && err.status < 500 ? err.status : 500).json({ error: 'Anfrage ungültig' });
   });
 
-  const server = https.createServer({ key: deps.tls.key, cert: deps.tls.cert, minVersion: 'TLSv1.2' }, app);
+  const server = https.createServer({
+    key: deps.tls.key, cert: deps.tls.cert, minVersion: 'TLSv1.2',
+    ...(deps.sniContext ? { SNICallback: (name: string, cb: (err: Error | null, ctx?: import('node:tls').SecureContext) => void) => cb(null, deps.sniContext!(name)) } : {}),
+  }, app);
 
   // ---------- WebSocket ----------
   const wss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
@@ -297,7 +304,7 @@ export function createServer(deps: ServerDeps) {
         clearTimeout(authTimer);
         session.deviceId = device.id;
         deps.devices.touch(device.id);
-        send(ws, { type: 'ready', deviceId: device.id, deviceName: device.name, protocol: PROTOCOL_VERSION, helperVersion: deps.version, platform: PLATFORM });
+        send(ws, { type: 'ready', deviceId: device.id, deviceName: device.name, protocol: PROTOCOL_VERSION, helperVersion: deps.version, platform: PLATFORM, tailscaleUrl: deps.tailscaleUrl?.() ?? null });
         send(ws, { type: 'config', config: deps.config.get() });
         send(ws, { type: 'timer', timer: deps.timers.get(), serverNow: Date.now() });
         send(ws, { type: 'permissions', permissions: deps.permissions.get() });

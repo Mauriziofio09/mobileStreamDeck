@@ -32,6 +32,12 @@ import { TIMER_LABEL, TIMER_MINUTES, TimerService } from '../core/timer.service'
               @if (conn.lastError(); as e) { <dt></dt><dd class="err">{{ e }}</dd> }
               <dt>{{ platform.host() }}</dt>
               <dd>{{ host }}</dd>
+              @if (conn.tailscaleUrl(); as ts) {
+                <dt>Unterwegs</dt>
+                <dd>{{ ts.replace('https://', '') }}
+                  @if (!isTailscaleOrigin(ts)) { <span class="hint-inline">(über Tailscale; dort als eigene App hinzufügen)</span> }
+                </dd>
+              }
               <dt>Dieses Gerät</dt>
               <dd>{{ conn.deviceName() || '–' }}</dd>
               <dt>App</dt>
@@ -131,6 +137,9 @@ export class SheetsComponent {
     this.store.toast(found ? 'Neue Version wird geladen …' : 'Copper Deck ist aktuell.', 'info');
   }
   protected readonly host = location.host;
+  protected isTailscaleOrigin(url: string): boolean {
+    return url.replace(/\/$/, '') === location.origin;
+  }
   protected readonly devices = signal<DeviceInfo[] | null>(null);
 
   protected readonly stateText = computed(() => {

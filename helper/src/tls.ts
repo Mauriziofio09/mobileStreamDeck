@@ -13,6 +13,8 @@ export interface HostInfo {
   /** z. B. "macbook-pro-von-maurizio.local" (kleingeschrieben, wie Browser den Origin senden) */
   readonly mdnsName: string;
   readonly lanIps: string[];
+  /** Weitere Namen fürs mkcert-Zertifikat, z. B. der Tailscale-Name (Rückfall, solange es kein echtes Zertifikat gibt). */
+  readonly extraNames?: readonly string[];
 }
 
 const MKCERT_CANDIDATES = IS_WINDOWS
@@ -88,6 +90,7 @@ export async function inspectCert(paths: Paths, host: HostInfo): Promise<CertSta
   const reasons: string[] = [];
   if (!names.includes(host.mdnsName)) reasons.push(`${host.mdnsName} fehlt`);
   for (const ip of host.lanIps) if (!names.includes(ip)) reasons.push(`IP ${ip} fehlt`);
+  for (const n of host.extraNames ?? []) if (!names.includes(n)) reasons.push(`${n} fehlt`);
   if (validTo.getTime() - Date.now() < RENEW_BEFORE_MS) reasons.push('läuft bald ab');
   return { exists: true, validTo, names, reasons };
 }
@@ -98,7 +101,7 @@ export async function ensureCert(exec: Exec, paths: Paths, host: HostInfo, force
   if (!force && status.exists && status.reasons.length === 0) return status;
   const mkcert = await findMkcert();
   await mkdir(paths.tlsDir, { recursive: true, mode: 0o700 });
-  const names = [host.mdnsName, ...host.lanIps, 'localhost', '127.0.0.1'];
+  const names = [host.mdnsName, ...(host.extraNames ?? []), ...host.lanIps, 'localhost', '127.0.0.1'];
   log('info', `Erzeuge TLS-Zertifikat (${status.reasons.join(', ') || 'erzwungen'})`, { names });
   await exec(mkcert, ['-cert-file', paths.cert, '-key-file', paths.key, ...names], { timeoutMs: 30_000 });
   if (!IS_WINDOWS) {

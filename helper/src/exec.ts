@@ -18,14 +18,14 @@ export class ExecError extends Error {
 }
 
 /** Startet ein Programm mit Argument-Array (keine Shell, keine String-Zusammensetzung). */
-export type Exec = (file: string, args: readonly string[], opts?: { timeoutMs?: number }) => Promise<ExecResult>;
+export type Exec = (file: string, args: readonly string[], opts?: { timeoutMs?: number; env?: Readonly<Record<string, string>> }) => Promise<ExecResult>;
 
 export const execFileSafe: Exec = (file, args, opts = {}) =>
   new Promise((resolve, reject) => {
     execFile(
       file,
       [...args],
-      { timeout: opts.timeoutMs ?? 10_000, maxBuffer: 4 * 1024 * 1024, shell: false, env: process.env, windowsHide: true },
+      { timeout: opts.timeoutMs ?? 10_000, maxBuffer: 4 * 1024 * 1024, shell: false, env: opts.env ? { ...process.env, ...opts.env } : process.env, windowsHide: true },
       (err, stdout, stderr) => {
         if (err) {
           const e = err as NodeJS.ErrnoException & { killed?: boolean; code?: number | string };

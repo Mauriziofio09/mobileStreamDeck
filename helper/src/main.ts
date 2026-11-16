@@ -21,6 +21,8 @@ import { MediaStore } from './media';
 import { PermissionMonitor } from './permissions';
 import { createServer } from './server';
 import { LightroomBridge } from './lightroom';
+import { createSecureContext, type SecureContext } from 'node:tls';
+import { findTailscale, tailscaleStatus, TailscaleCerts } from './tailscale';
 import { TimerManager } from './timer';
 import { actionSchema } from '@copper-deck/shared/schema';
 import { access, writeFile } from 'node:fs/promises';
@@ -49,8 +51,12 @@ async function serve(): Promise<void> {
   initLog(paths.logs);
   await mkdir(paths.data, { recursive: true, mode: 0o700 });
   const settings = await loadSettings();
-  const host = await hostInfo(execFileSafe);
-  const cert = await ensureCert(execFileSafe, paths, host);
+  // Tailscale (optional): Name fürs Zertifikat und als zusätzliche erlaubte Adresse.
+  const tsBin = await findTailscale();
+  const tsInitial = await tailscaleStatus(execFileSafe, tsBin);
+  let tsName = tsInitial.running ? tsInitial.dnsName : null;
+  let host = { ...(await hostInfo(execFileSafe)), ...(tsName ? { extraNames: [tsName] } : {}) };
+  let cert = await ensureCert(execFileSafe, paths, host);
 
   const native = new Native(execFileSafe, resolveNativeBinary());
   const context = process.env['COPPER_DECK_CONTEXT'] === 'app' ? 'app' : 'terminal';
@@ -79,6 +85,14 @@ async function serve(): Promise<void> {
   );
   const pairing = new PairingManager();
   const origins = [`https://${host.mdnsName}:${settings.port}`, `https://localhost:${settings.port}`];
+  const tsOrigin = (name: string) => `https://${name}:${settings.port}`;
+  if (tsName) origins.push(tsOrigin(tsName));
+  const tsCerts = new TailscaleCerts(execFileSafe, path.join(paths.tlsDir, 'tailscale'));
+  let tsContext: SecureContext | null = null;
+  const useTsCert = () => {
+    const c = tsCerts.get();
+    tsContext = c && c.name === tsName ? createSecureContext({ key: c.key, cert: c.cert, minVersion: 'TLSv1.2' }) : null;
+  };
   const webRoot = process.env['COPPER_DECK_WEB']
     ?? [path.resolve(here, '../web'), path.resolve(here, '../../web/dist/web/browser')].find((p) => existsSync(path.join(p, 'index.html')))
     ?? path.resolve(here, '../../web/dist/web/browser');
@@ -113,6 +127,8 @@ async function serve(): Promise<void> {
     devices, pairing, config, catalog, runner, timers, permissions, lightroom, lightroomExport,
     media,
     origins, webRoot, tls: await readTls(), version: VERSION,
+    tailscaleUrl: () => (tsName ? tsOrigin(tsName) : null),
+    sniContext: (name) => (tsContext && name.toLowerCase() === tsName ? tsContext : undefined),
   });
 
   const admin = await startAdminServer(paths.adminSocket, async (req: AdminRequest) => {
@@ -120,14 +136,23 @@ async function serve(): Promise<void> {
       case 'pair': {
         const { code, expiresAt } = pairing.create();
         log('info', 'Kopplungscode erzeugt'); // Code selbst nie ins Log
-        return { code, expiresAt, url: origins[0] };
+        return { code, expiresAt, url: origins[0], tailscaleUrl: tsName ? tsOrigin(tsName) : null };
       }
       case 'devices':
         return { devices: devices.list(), connected: [...srv.connectedDevices()] };
       case 'revoke':
         return { revoked: await srv.revokeDevice(req.id) };
       case 'status':
-        return { version: VERSION, url: origins[0], pid: process.pid, devices: devices.list().length, certValidTo: cert.validTo };
+        return { version: VERSION, url: origins[0], tailscaleUrl: tsName ? tsOrigin(tsName) : null, pid: process.pid, devices: devices.list().length, certValidTo: cert.validTo };
+      case 'tailscale': {
+        const st = await tailscaleStatus(execFileSafe, tsBin);
+        const c = tsCerts.get();
+        return {
+          ...st, url: tsName ? tsOrigin(tsName) : null,
+          certificate: c && c.name === tsName ? { issuer: 'Let\'s Encrypt (über Tailscale)', validTo: c.validTo } : null,
+          certificateError: tsCerts.lastError,
+        };
+      }
       case 'permissions':
         return permissions.check();
       case 'notifyTest': {
@@ -152,7 +177,32 @@ async function serve(): Promise<void> {
     srv.server.once('error', reject);
     srv.server.listen(settings.port, '0.0.0.0', () => resolve());
   });
-  log('info', `Copper Deck ${VERSION} läuft: ${origins[0]}`, { platform: PLATFORM, ips: host.lanIps, webRoot, context, native: native.binary });
+  log('info', `Copper Deck ${VERSION} läuft: ${origins[0]}`, { platform: PLATFORM, ips: host.lanIps, tailscale: tsName, webRoot, context, native: native.binary });
+
+  // Tailscale: alle 10 Minuten Name und Zertifikat prüfen. Ein neues Zertifikat holt der Helper erst,
+  // wenn das alte weniger als 30 Tage gilt; schlägt es fehl (z. B. Firmen-WLAN), gilt das mkcert-Zertifikat weiter.
+  const refreshTailscale = async () => {
+    const st = await tailscaleStatus(execFileSafe, tsBin);
+    if (!st.running || !st.dnsName) return;
+    if (st.dnsName !== tsName) {
+      if (tsName) origins.splice(origins.indexOf(tsOrigin(tsName)), 1);
+      tsName = st.dnsName;
+      origins.push(tsOrigin(tsName));
+      log('info', 'Tailscale-Adresse', { url: tsOrigin(tsName) });
+      // mkcert-Rückfall um den neuen Namen ergänzen
+      host = { ...host, extraNames: [tsName] };
+      cert = await ensureCert(execFileSafe, paths, host);
+      srv.server.setSecureContext(await readTls());
+    }
+    if (!st.certAllowed || !tsBin) return;
+    if (!tsCerts.get()) await tsCerts.load(tsName);
+    await tsCerts.ensure(tsBin, tsName);
+    useTsCert();
+  };
+  if (tsBin) {
+    void refreshTailscale().catch((e: Error) => log('warn', 'Tailscale-Prüfung fehlgeschlagen', { error: e.message }));
+    setInterval(() => void refreshTailscale().catch(() => undefined), 10 * 60_000).unref();
+  }
 
   // Berechtigungen: Systemdialoge nur beim ersten Start im App-Kontext zeigen, danach still prüfen.
   if (native.available) {
@@ -188,12 +238,13 @@ async function cli(cmd: string, args: string[]): Promise<void> {
 
   switch (cmd) {
     case 'pair': {
-      const r = (await call({ cmd: 'pair' })) as { code: string; expiresAt: number; url: string };
+      const r = (await call({ cmd: 'pair' })) as { code: string; expiresAt: number; url: string; tailscaleUrl: string | null };
       const until = new Date(r.expiresAt).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
       process.stdout.write(
         `\n  Kopplungscode:  ${r.code.slice(0, 3)} ${r.code.slice(3)}\n\n` +
           `  Gültig bis ${until} (5 Minuten), einmalig, höchstens 5 Fehlversuche.\n` +
-          `  In der installierten Copper-Deck-App auf dem Home-Bildschirm eingeben.\n  Adresse: ${r.url}\n\n`,
+          `  In der installierten Copper-Deck-App auf dem Home-Bildschirm eingeben.\n  Adresse: ${r.url}\n` +
+          (r.tailscaleUrl ? `  Über Tailscale (überall): ${r.tailscaleUrl}\n` : '') + '\n',
       );
       return;
     }
@@ -223,6 +274,16 @@ async function cli(cmd: string, args: string[]): Promise<void> {
     case 'permissions': {
       const r = await call({ cmd: 'permissions' });
       process.stdout.write(JSON.stringify(r, null, 2) + '\n');
+      return;
+    }
+    case 'tailscale': {
+      const r = (await call({ cmd: 'tailscale' })) as { installed: boolean; running: boolean; url: string | null; certAllowed: boolean; certificate: { validTo: string } | null; certificateError: string | null };
+      if (!r.installed) { process.stdout.write('Tailscale ist nicht installiert (https://tailscale.com/download).\n'); return; }
+      if (!r.running) { process.stdout.write('Tailscale ist installiert, aber nicht verbunden. Tailscale-App öffnen und anmelden.\n'); return; }
+      process.stdout.write(`Adresse: ${r.url}\n`);
+      if (r.certificate) process.stdout.write(`Zertifikat: Let's Encrypt, gültig bis ${r.certificate.validTo.slice(0, 10)} – kein mkcert-Profil nötig.\n`);
+      else if (!r.certAllowed) process.stdout.write('Zertifikat: HTTPS im Tailscale-Netz aktivieren (login.tailscale.com → DNS → HTTPS Certificates). Bis dahin gilt das mkcert-Zertifikat.\n');
+      else process.stdout.write(`Zertifikat: noch keins${r.certificateError ? ` (${r.certificateError})` : ''}. Bis dahin gilt das mkcert-Zertifikat; neuer Versuch alle 10 Minuten.\n`);
       return;
     }
     case 'status': {
@@ -277,6 +338,7 @@ async function cli(cmd: string, args: string[]): Promise<void> {
           '  copper-deck cert [--renew]   TLS-Zertifikat prüfen/erneuern\n' +
           `  copper-deck ca               mkcert-Root-CA im ${IS_WINDOWS ? 'Explorer' : 'Finder'} zeigen\n` +
           '  copper-deck status           Status des laufenden Helpers\n' +
+          '  copper-deck tailscale        Adresse und Zertifikat für unterwegs (Tailscale)\n' +
           (IS_WINDOWS
             ? '  copper-deck add-app <exe> [Name]  Programm in die App-Auswahl aufnehmen\n'
             : '  copper-deck permissions      macOS-Berechtigungen prüfen\n') +

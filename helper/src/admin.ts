@@ -15,7 +15,8 @@ export type AdminRequest =
   | { cmd: 'reloadTls' }
   | { cmd: 'permissions' }
   | { cmd: 'runAction'; action: unknown }
-  | { cmd: 'notifyTest' };
+  | { cmd: 'notifyTest' }
+  | { cmd: 'tailscale' };
 
 export type AdminHandler = (req: AdminRequest) => Promise<unknown>;
 
