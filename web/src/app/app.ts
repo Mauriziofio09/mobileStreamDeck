@@ -15,6 +15,7 @@ import { TileEditorComponent } from './ui/tile-editor.component';
 import { BarItemEditorComponent } from './ui/bar-item-editor.component';
 import { EditorService } from './core/editor.service';
 import { UpdateService } from './core/update.service';
+import { PlatformService } from './core/platform.service';
 
 @Component({
   selector: 'app-root',
@@ -37,6 +38,7 @@ export class App {
   protected readonly conn = inject(ConnectionService);
   protected readonly editor = inject(EditorService);
   protected readonly updates = inject(UpdateService);
+  protected readonly platform = inject(PlatformService);
 
   /** Kopplung, Offline-Vollbild (noch nie Konfiguration erhalten) oder das Deck. */
   protected readonly view = computed<'pairing' | 'offline' | 'deck'>(() => {

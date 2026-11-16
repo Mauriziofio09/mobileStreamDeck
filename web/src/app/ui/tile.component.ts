@@ -212,11 +212,7 @@ export class TileComponent {
     this.longTimer = setTimeout(() => {
       this.longFired = true;
       this.pressed.set(false);
-      if (!this.conn.online()) {
-        this.store.toast('Bearbeiten ist nur mit Verbindung zum Mac möglich.', 'error');
-        return;
-      }
-      this.store.editMode.set(true);
+      this.store.enterEditMode();
     }, GESTURE.longPressMs);
   }
 

@@ -10,7 +10,7 @@ import {
   CLOSE, PROTOCOL_VERSION, WS_PATH,
   type DeckConfig, type InstalledApp, type ServerMessage,
 } from '@copper-deck/shared';
-import { BUNDLE_ID_PATTERN, clientMessageSchema, deckConfigSchema, pairRequestSchema } from '@copper-deck/shared/schema';
+import { APP_ID_PATTERN, clientMessageSchema, deckConfigSchema, pairRequestSchema } from '@copper-deck/shared/schema';
 import { MEDIA_MAX_BYTES, MEDIA_TYPES } from '@copper-deck/shared';
 import type { MediaStore } from './media';
 import { isSystemAction, resolveAction, type ActionRunner, type RunResult } from './actions/runner';
@@ -21,6 +21,7 @@ import { log } from './log';
 import type { PairingManager } from './pairing';
 import type { PermissionMonitor } from './permissions';
 import type { TimerManager } from './timer';
+import { PLATFORM } from './platform';
 
 export interface ServerDeps {
   readonly devices: DeviceStore;
@@ -96,6 +97,11 @@ export function createServer(deps: ServerDeps) {
     next();
   });
 
+  // Betriebssystem (ohne Token): Kopplungs- und Offline-Ansicht sprechen von "Mac" bzw. "PC".
+  api.get('/platform', (_req, res) => {
+    res.json({ platform: PLATFORM });
+  });
+
   // Kopplung (ohne Token)
   api.post('/pair', express.json({ limit: '2kb' }), async (req, res) => {
     const body = pairRequestSchema.safeParse(req.body);
@@ -155,7 +161,7 @@ export function createServer(deps: ServerDeps) {
 
   api.get('/icons/:bundleId', async (req, res) => {
     const bundleId = String(req.params['bundleId'] ?? '').replace(/\.png$/, '');
-    if (!BUNDLE_ID_PATTERN.test(bundleId)) {
+    if (!APP_ID_PATTERN.test(bundleId)) {
       res.status(400).end();
       return;
     }
@@ -285,7 +291,7 @@ export function createServer(deps: ServerDeps) {
         clearTimeout(authTimer);
         session.deviceId = device.id;
         deps.devices.touch(device.id);
-        send(ws, { type: 'ready', deviceId: device.id, deviceName: device.name, protocol: PROTOCOL_VERSION, helperVersion: deps.version });
+        send(ws, { type: 'ready', deviceId: device.id, deviceName: device.name, protocol: PROTOCOL_VERSION, helperVersion: deps.version, platform: PLATFORM });
         send(ws, { type: 'config', config: deps.config.get() });
         send(ws, { type: 'timer', timer: deps.timers.get(), serverNow: Date.now() });
         send(ws, { type: 'permissions', permissions: deps.permissions.get() });

@@ -1,9 +1,11 @@
-import { homedir } from 'node:os';
+import { createHash } from 'node:crypto';
+import { homedir, userInfo } from 'node:os';
 import path from 'node:path';
+import { IS_WINDOWS } from './platform';
 
 /**
- * Daten: ~/Library/Application Support/CopperDeck/
- * Logs:  ~/Library/Logs/CopperDeck/
+ * macOS:   Daten ~/Library/Application Support/CopperDeck/, Logs ~/Library/Logs/CopperDeck/
+ * Windows: Daten %LOCALAPPDATA%\CopperDeck\,              Logs %LOCALAPPDATA%\CopperDeck\Logs\
  * Für Tests per COPPER_DECK_HOME / COPPER_DECK_LOGS umlenkbar.
  */
 export interface Paths {
@@ -22,8 +24,9 @@ export interface Paths {
 }
 
 export function resolvePaths(env: NodeJS.ProcessEnv = process.env): Paths {
-  const data = env['COPPER_DECK_HOME'] ?? path.join(homedir(), 'Library/Application Support/CopperDeck');
-  const logs = env['COPPER_DECK_LOGS'] ?? path.join(homedir(), 'Library/Logs/CopperDeck');
+  const winBase = path.join(env['LOCALAPPDATA'] ?? path.join(homedir(), 'AppData', 'Local'), 'CopperDeck');
+  const data = env['COPPER_DECK_HOME'] ?? (IS_WINDOWS ? winBase : path.join(homedir(), 'Library/Application Support/CopperDeck'));
+  const logs = env['COPPER_DECK_LOGS'] ?? (IS_WINDOWS ? path.join(winBase, 'Logs') : path.join(homedir(), 'Library/Logs/CopperDeck'));
   return {
     data,
     logs,
@@ -35,7 +38,16 @@ export function resolvePaths(env: NodeJS.ProcessEnv = process.env): Paths {
     key: path.join(data, 'tls/key.pem'),
     iconCache: path.join(data, 'icons'),
     bin: path.join(data, 'bin'),
-    adminSocket: path.join(data, 'admin.sock'),
+    adminSocket: IS_WINDOWS ? windowsPipe(data) : path.join(data, 'admin.sock'),
     settings: path.join(data, 'settings.json'),
   };
+}
+
+/**
+ * Windows kennt keine Unix-Sockets im Datenordner; der Admin-Kanal ist eine Named Pipe pro Benutzer
+ * und Datenordner. Sie ist lokal; Windows erlaubt anderen Benutzern standardmässig nur Lesen, nicht Schreiben.
+ */
+function windowsPipe(data: string): string {
+  const tag = createHash('sha256').update(`${userInfo().username}|${data.toLowerCase()}`).digest('hex').slice(0, 16);
+  return `\\\\.\\pipe\\copperdeck-admin-${tag}`;
 }

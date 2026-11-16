@@ -65,6 +65,6 @@
 
 @if (view() === 'deck' && !conn.online()) {
   <div class="conn-banner" data-no-swipe role="status" (click)="conn.connect()">
-    <span class="conn-dot"></span>{{ conn.state() === 'connecting' ? 'Verbinde mit dem Mac …' : 'Offline – Aktionen sind deaktiviert' }}
+    <span class="conn-dot"></span>{{ conn.state() === 'connecting' ? 'Verbinde mit dem ' + platform.host() + ' …' : 'Offline – Aktionen sind deaktiviert' }}
   </div>
 }

@@ -1,6 +1,7 @@
 import { chmod, rm } from 'node:fs/promises';
 import net from 'node:net';
 import { log } from './log';
+import { IS_WINDOWS } from './platform';
 
 /**
  * Lokaler Admin-Kanal für die CLI (copper-deck pair/devices/revoke) über einen Unix-Socket
@@ -27,7 +28,7 @@ export async function startAdminServer(socketPath: string, handler: AdminHandler
     if (i >= 12) throw new Error('Ein anderer Copper-Deck-Helper läuft bereits.');
     await new Promise((r) => setTimeout(r, 500));
   }
-  await rm(socketPath, { force: true });
+  if (!IS_WINDOWS) await rm(socketPath, { force: true });
   const server = net.createServer((sock) => {
     let buf = '';
     sock.setEncoding('utf8');
@@ -56,7 +57,7 @@ export async function startAdminServer(socketPath: string, handler: AdminHandler
     server.once('error', reject);
     server.listen(socketPath, () => resolve());
   });
-  await chmod(socketPath, 0o600);
+  if (!IS_WINDOWS) await chmod(socketPath, 0o600);
   log('info', 'Admin-Socket bereit');
   return server;
 }

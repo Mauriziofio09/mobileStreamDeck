@@ -9,8 +9,16 @@ import { ID_PATTERN } from './protocol';
 const id = z.string().regex(ID_PATTERN);
 /** IDs in der Konfiguration: "sys-" ist für feste System-Aktionen reserviert. */
 const configId = id.refine((v) => !v.startsWith('sys-'), 'Präfix sys- ist reserviert');
+/** macOS Bundle-ID (der Mac-Helper prüft zusätzlich dieses strenge Muster). */
 export const BUNDLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9.-]{0,199}$/;
-const bundleId = z.string().regex(BUNDLE_ID_PATTERN);
+/**
+ * App-Kennung allgemein: macOS Bundle-ID oder Windows AppUserModelID (z. B. "MSEdge",
+ * "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App", "{6D809377-…}\\Notepad++\\notepad++.exe").
+ * Keine Steuerzeichen und keine Zeichen, die in Windows-Pfaden verboten sind. Gestartet wird nur,
+ * was der Helper im eigenen App-Katalog findet.
+ */
+export const APP_ID_PATTERN = /^[^\p{Cc}<>"|?*]{1,260}$/u;
+const bundleId = z.string().regex(APP_ID_PATTERN);
 /** Ein Emoji bzw. eine kurze Zeichenfolge ohne Steuerzeichen. */
 const emoji = z.string().min(1).max(32).regex(/^[^\p{Cc}\s<>]+$/u);
 const label = z.string().trim().min(1).max(40).regex(/^[^\p{Cc}]+$/u);

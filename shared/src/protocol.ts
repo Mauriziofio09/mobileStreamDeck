@@ -1,4 +1,4 @@
-import type { DeckConfig, InstalledApp } from './config';
+import type { DeckConfig, HostPlatform, InstalledApp } from './config';
 
 /**
  * WebSocket-Protokoll zwischen PWA und Helper.
@@ -77,7 +77,7 @@ export const SYSTEM_ACTIONS = [
 export type SystemActionId = (typeof SYSTEM_ACTIONS)[number];
 
 export type ServerMessage =
-  | { readonly type: 'ready'; readonly deviceId: string; readonly deviceName: string; readonly protocol: number; readonly helperVersion: string }
+  | { readonly type: 'ready'; readonly deviceId: string; readonly deviceName: string; readonly protocol: number; readonly helperVersion: string; readonly platform: HostPlatform }
   | { readonly type: 'config'; readonly config: DeckConfig }
   /** Installierte Apps, die in der Konfiguration vorkommen (für "nicht verfügbar"). */
   | { readonly type: 'apps'; readonly apps: readonly InstalledApp[] }
@@ -88,6 +88,11 @@ export type ServerMessage =
   | { readonly type: 'permissions'; readonly permissions: PermissionState }
   | { readonly type: 'saveResult'; readonly requestId: string; readonly ok: true; readonly revision: number }
   | { readonly type: 'saveResult'; readonly requestId: string; readonly ok: false; readonly reason: SaveRejectReason; readonly message: string; readonly issues?: readonly string[] };
+
+/** Antwort von GET /api/platform (ohne Anmeldung, damit Kopplungs- und Offline-Ansicht passende Texte zeigen). */
+export interface PlatformInfo {
+  readonly platform: HostPlatform;
+}
 
 /** Antwort von POST /api/media */
 export interface MediaUploadResponse {

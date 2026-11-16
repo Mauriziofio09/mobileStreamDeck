@@ -21,7 +21,7 @@
           <section>
             <label class="lbl" for="ed-action">Aktion</label>
             <select id="ed-action" [value]="actionType()" (change)="setAction(text($event))">
-              @for (a of actions; track a.type) { <option [value]="a.type">{{ a.label }}</option> }
+              @for (a of actions(); track a.type) { <option [value]="a.type">{{ a.label }}</option> }
             </select>
           </section>
         }
@@ -52,16 +52,16 @@
             <section>
               <span class="lbl">Tastenkombination <strong class="combo">{{ hotkeyText() }}</strong></span>
               <div class="mods">
-                @for (m of modifiers; track m) {
+                @for (m of modifiers(); track m) {
                   <button type="button" [class.on]="mods().includes(m)" (click)="toggleMod(m)" [attr.aria-pressed]="mods().includes(m)">
-                    <b>{{ modSymbol[m] }}</b> {{ modName[m] }}
+                    <b>{{ modSymbol()[m] }}</b>@if (modName()[m] !== modSymbol()[m]) { {{ modName()[m] }} }
                   </button>
                 }
               </div>
               <select aria-label="Taste" [value]="key()" (change)="key.set($any(text($event)))">
                 @for (k of keys; track k) { <option [value]="k">{{ keyLabel(k) }}</option> }
               </select>
-              <p class="hint">Buchstaben folgen dem Tastaturlayout des Macs (z. B. Schweizerdeutsch).</p>
+              <p class="hint">Buchstaben folgen dem Tastaturlayout des {{ platform.isWindows() ? 'PCs' : 'Macs' }} (z. B. Schweizerdeutsch).</p>
             </section>
           }
           @case ('insertEmoji') {

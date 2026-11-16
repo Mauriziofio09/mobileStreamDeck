@@ -6,6 +6,7 @@ import { log } from '../log';
 import type { Native } from '../native';
 import type { PermissionMonitor } from '../permissions';
 import type { TimerManager } from '../timer';
+import type { WindowsActions } from './windows';
 
 export type RunResult =
   | { readonly ok: true; readonly message?: string; readonly details?: readonly string[] }
@@ -60,6 +61,8 @@ export interface RunnerDeps {
   readonly permissions: PermissionMonitor;
   readonly keystrokeScript: string;
   readonly activateScript: string;
+  /** Gesetzt unter Windows; dann laufen alle Aktionen ausser dem Timer darüber. */
+  readonly windows?: WindowsActions;
 }
 
 /**
@@ -74,6 +77,18 @@ export class ActionRunner {
     const parsed = actionSchema.safeParse(action);
     if (!parsed.success) return fail('invalid_request', 'Aktion ist ungültig.');
     const a = parsed.data;
+    const win = this.d.windows;
+    if (win) {
+      switch (a.type) {
+        case 'openApp': return win.openApp(a.bundleId);
+        case 'openUrl': return this.checkUrl(a.url) ?? win.openUrl(a.url);
+        case 'hotkey': return win.hotkey(a.modifiers, a.key);
+        case 'tileWindows': return win.tileWindows();
+        case 'stageManager': return fail('not_implemented', 'Stage Manager gibt es nur am Mac.');
+        case 'timer': return this.timer(a.preset);
+        case 'insertEmoji': return win.insertEmoji(a.emoji);
+      }
+    }
     switch (a.type) {
       case 'openApp': return this.openApp(a.bundleId);
       case 'openUrl': return this.openUrl(a.url);
@@ -86,6 +101,9 @@ export class ActionRunner {
   }
 
   async runSystem(id: SystemActionId): Promise<RunResult> {
+    if (this.d.windows && (id.startsWith('sys-settings-') || id === 'sys-request-permissions')) {
+      return { ok: true, message: 'Unter Windows sind keine Berechtigungen nötig.' };
+    }
     switch (id) {
       case 'sys-timer-pomodoro': return this.timer('pomodoro');
       case 'sys-timer-break': return this.timer('break');
@@ -133,15 +151,22 @@ export class ActionRunner {
     }
   }
 
-  /** Öffnet im Standardbrowser. Nur http/https. */
-  private async openUrl(url: string): Promise<RunResult> {
+  /** Prüft einen Link (nur http/https); null = in Ordnung. */
+  private checkUrl(url: string): RunResult | null {
     let u: URL;
     try {
       u = new URL(url);
     } catch {
       return fail('invalid_url', 'Der Link ist ungültig.');
     }
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') return fail('invalid_url', 'Nur http- und https-Links sind erlaubt.');
+    return u.protocol === 'http:' || u.protocol === 'https:' ? null : fail('invalid_url', 'Nur http- und https-Links sind erlaubt.');
+  }
+
+  /** Öffnet im Standardbrowser. Nur http/https. */
+  private async openUrl(url: string): Promise<RunResult> {
+    const bad = this.checkUrl(url);
+    if (bad) return bad;
+    const u = new URL(url);
     try {
       await this.d.exec('/usr/bin/open', [u.href]);
       return { ok: true };

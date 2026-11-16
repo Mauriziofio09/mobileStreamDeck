@@ -6,6 +6,7 @@ import {
 import { AppCatalogService } from '../core/app-catalog.service';
 import { EditorService, newId } from '../core/editor.service';
 import { MediaService } from '../core/media.service';
+import { PlatformService } from '../core/platform.service';
 import { SurfaceDirective } from '../core/surface.directive';
 import { TileComponent } from './tile.component';
 import { AppPickerComponent, type AppEntry } from './app-picker.component';
@@ -25,6 +26,12 @@ const ACTIONS: readonly { type: ActionType; label: string }[] = [
 
 const MOD_SYMBOL: Record<Modifier, string> = { command: '⌘', option: '⌥', control: '⌃', shift: '⇧' };
 const MOD_NAME: Record<Modifier, string> = { command: 'Befehl', option: 'Wahl', control: 'Control', shift: 'Umschalt' };
+/**
+ * Windows: dieselben vier Tasten nach ihrer Lage auf der Tastatur –
+ * ⌘ entspricht der Windows-Taste, ⌥ Alt, ⌃ Strg.
+ */
+const WIN_MOD_SYMBOL: Record<Modifier, string> = { command: 'Win', option: 'Alt', control: 'Strg', shift: '⇧' };
+const WIN_MOD_NAME: Record<Modifier, string> = { command: 'Windows', option: 'Alt', control: 'Strg', shift: 'Umschalt' };
 const KEY_NAME: Partial<Record<HotkeyKey, string>> = {
   space: 'Leertaste', return: 'Zeilenschalter', tab: 'Tab', escape: 'Esc', delete: 'Rückschritt', forwarddelete: 'Entf',
   up: 'Pfeil ↑', down: 'Pfeil ↓', left: 'Pfeil ←', right: 'Pfeil →', home: 'Pos1', end: 'Ende', pageup: 'Bild ↑', pagedown: 'Bild ↓',
@@ -41,12 +48,19 @@ export class TileEditorComponent {
   protected readonly editor = inject(EditorService);
   protected readonly catalog = inject(AppCatalogService);
   private readonly media = inject(MediaService);
+  protected readonly platform = inject(PlatformService);
 
-  protected readonly actions = ACTIONS;
-  protected readonly modifiers = MODIFIERS;
+  /** Stage Manager gibt es nur am Mac (bleibt sichtbar, wenn die Kachel ihn schon verwendet). */
+  protected readonly actions = computed(() =>
+    ACTIONS.filter((a) => a.type !== 'stageManager' || !this.platform.isWindows() || this.actionType() === 'stageManager'),
+  );
+  /** Unter Windows in der üblichen Reihenfolge Strg, Alt, Umschalt, Win. */
+  protected readonly modifiers = computed<readonly Modifier[]>(() =>
+    this.platform.isWindows() ? ['control', 'option', 'shift', 'command'] : MODIFIERS,
+  );
   protected readonly keys = HOTKEY_KEYS;
-  protected readonly modSymbol = MOD_SYMBOL;
-  protected readonly modName = MOD_NAME;
+  protected readonly modSymbol = computed(() => (this.platform.isWindows() ? WIN_MOD_SYMBOL : MOD_SYMBOL));
+  protected readonly modName = computed(() => (this.platform.isWindows() ? WIN_MOD_NAME : MOD_NAME));
 
   // Entwurf
   protected readonly kind = signal<'app' | 'action'>('action');
@@ -175,6 +189,8 @@ export class TileEditorComponent {
   }
 
   protected setAction(t: string): void {
+    // Neue Tastenkombination: ⌘ am Mac, Strg unter Windows vorbelegen.
+    if (t === 'hotkey' && this.actionType() !== 'hotkey') this.mods.set(this.platform.isWindows() ? ['control'] : ['command']);
     this.actionType.set(t as ActionType);
     if (t !== 'openApp' && this.iconType() === 'appIcon') this.iconType.set('emoji');
   }
@@ -187,7 +203,11 @@ export class TileEditorComponent {
     return KEY_NAME[k] ?? k.toUpperCase();
   }
 
-  protected hotkeyText = computed(() => `${this.mods().map((m) => MOD_SYMBOL[m]).join('')}${this.keyLabel(this.key())}`);
+  protected hotkeyText = computed(() => {
+    const key = this.keyLabel(this.key());
+    if (!this.platform.isWindows()) return `${this.mods().map((m) => MOD_SYMBOL[m]).join('')}${key}`;
+    return [...this.modifiers().filter((m) => this.mods().includes(m)).map((m) => WIN_MOD_SYMBOL[m]), key].join('+');
+  });
 
   protected openPicker(): void {
     this.picking.set(true);

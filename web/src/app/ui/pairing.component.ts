@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import type { ApiError, PairResponse } from '@copper-deck/shared';
 import { AuthService, isIOS, isStandalone } from '../core/auth.service';
 import { ConnectionService } from '../core/connection.service';
+import { PlatformService } from '../core/platform.service';
 import { SurfaceDirective } from '../core/surface.directive';
 
 /**
@@ -24,7 +25,7 @@ import { SurfaceDirective } from '../core/surface.directive';
         </ol>
         <p class="note">Warum? iOS trennt den Speicher von Safari und Home-Bildschirm-Apps. Ein hier gespeichertes Token wäre in der App nicht vorhanden.</p>
       } @else {
-        <p class="lead">Am Mac im Terminal <code>copper-deck pair</code> ausführen und den 6-stelligen Code eingeben.</p>
+        <p class="lead">Am {{ platform.host() }} im {{ platform.isWindows() ? 'PowerShell-Fenster' : 'Terminal' }} <code>copper-deck pair</code> ausführen und den 6-stelligen Code eingeben.</p>
         @if (conn.lastError(); as e) { <p class="error">{{ e }}</p> }
         <form (submit)="submit($event)">
           <label>
@@ -56,6 +57,7 @@ import { SurfaceDirective } from '../core/surface.directive';
 })
 export class PairingComponent {
   protected readonly conn = inject(ConnectionService);
+  protected readonly platform = inject(PlatformService);
   private readonly auth = inject(AuthService);
   protected readonly needsInstall = isIOS() && !isStandalone();
   protected readonly code = signal('');
@@ -94,7 +96,7 @@ export class PairingComponent {
       this.conn.lastError.set(null);
       this.conn.connect();
     } catch {
-      this.error.set('Mac nicht erreichbar. Läuft der Helper, und bist du im selben WLAN?');
+      this.error.set(`${this.platform.host()} nicht erreichbar. Läuft der Helper, und bist du im selben WLAN?`);
     } finally {
       this.busy.set(false);
     }

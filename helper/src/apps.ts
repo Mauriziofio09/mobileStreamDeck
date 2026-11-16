@@ -22,12 +22,21 @@ interface AppEntry extends InstalledApp {
 
 const exists = (p: string): Promise<boolean> => access(p).then(() => true, () => false);
 
+/** Katalog installierter Apps (macOS: MacAppCatalog, Windows: WindowsAppCatalog in apps-windows.ts). */
+export interface AppCatalog {
+  list(): Promise<InstalledApp[]>;
+  get(bundleId: string): Promise<InstalledApp | null>;
+  /** Pfad zum gecachten PNG oder null, wenn die App nicht installiert ist. */
+  icon(bundleId: string): Promise<string | null>;
+  rescan(): Promise<void>;
+}
+
 /**
- * Katalog installierter Apps + Icon-Cache (PNG).
+ * macOS: Katalog installierter Apps + Icon-Cache (PNG).
  * Icons: sips aus der .icns; liegt das aktuelle Icon in Assets.car (CFBundleIconName),
  * oder fehlt eine .icns, rendert das native Programm (Copper Deck Helper.app) das Icon über NSWorkspace.
  */
-export class AppCatalog {
+export class MacAppCatalog implements AppCatalog {
   private apps = new Map<string, AppEntry>();
   private scannedAt = 0;
   private scanning: Promise<void> | null = null;
@@ -176,7 +185,7 @@ async function listApps(dir: string, depth = 0): Promise<string[]> {
 }
 
 /** Dock-Vorschlag: Apps aus dem echten Dock, dann zuletzt verwendete, dann Ergänzungen. */
-export async function suggestDock(exec: Exec, catalog: AppCatalog, max = 12): Promise<{ bundleId: string; name: string }[]> {
+export async function suggestDock(exec: Exec, catalog: MacAppCatalog, max = 12): Promise<{ bundleId: string; name: string }[]> {
   const ids: string[] = [];
   for (const key of ['persistent-apps', 'recent-apps']) {
     try {

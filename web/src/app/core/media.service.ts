@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import type { ApiError, MediaUploadResponse } from '@copper-deck/shared';
 import { MEDIA_MAX_BYTES, MEDIA_TYPES } from '@copper-deck/shared';
 import { AuthService } from './auth.service';
+import { PlatformService } from './platform.service';
 
 const CACHE = 'copperdeck-media-v1';
 
@@ -9,6 +10,7 @@ const CACHE = 'copperdeck-media-v1';
 @Injectable({ providedIn: 'root' })
 export class MediaService {
   private readonly auth = inject(AuthService);
+  private readonly platform = inject(PlatformService);
   private readonly urls = signal<ReadonlyMap<string, string>>(new Map());
   private readonly requested = new Set<string>();
 
@@ -33,7 +35,7 @@ export class MediaService {
       this.urls.update((m) => new Map(m).set(file, URL.createObjectURL(f)));
       return { ok: true, file };
     } catch {
-      return { ok: false, error: 'Mac nicht erreichbar.' };
+      return { ok: false, error: `${this.platform.host()} nicht erreichbar.` };
     }
   }
 

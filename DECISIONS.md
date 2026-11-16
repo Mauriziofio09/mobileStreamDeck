@@ -300,3 +300,37 @@ Hier steht, was ich selbst entschieden habe. Neue Einträge kommen jeweils unten
 ### Einrichtung in isolierten Netzen
 - Im Firmen-WLAN kam das iPhone nicht an den Mac (Zeitüberschreitung, auch mit IP-Adresse): Client Isolation. Gelöst mit dem iPhone-Hotspot per USB. Im README unter Fehlerbehebung ergänzt, dazu iCloud Drive bzw. Mail als Weg für das Zertifikat, wenn AirDrop nicht geht.
 - Ich erlaube die IP-Adresse bewusst **nicht** als zusätzlichen Origin: Sie ändert sich je nach Netz, und die App auf dem Home-Bildschirm ist an ihre Adresse gebunden.
+
+## Meilenstein 6 – Windows-Version (Version 0.7.0)
+
+### Architektur
+- **Ein Helper für beide Systeme.** Node-Teil, Web-App, Protokoll und Konfiguration sind gemeinsam. Nur die Systemzugriffe unterscheiden sich: `helper/src/platform.ts` erkennt Windows, `WindowsAppCatalog` und `WindowsActions` ersetzen dort die Mac-Teile.
+- **Natives Programm in C# statt Swift** (`helper/native/windows/CopperDeckHelper.cs`). Es wird bei der Installation mit dem `csc.exe` des .NET Framework 4.x gebaut, das auf jedem Windows 10/11 vorhanden ist. So braucht es weder Visual Studio noch ein .NET-SDK, und ich liefere keine vorkompilierte .exe aus. Deshalb nur C#-5-Sprachmittel. Es hat dieselbe Schnittstelle wie das Mac-Programm (Unterbefehle, eine JSON-Zeile auf stdout).
+- **Autostart:** Aufgabenplanung („bei Anmeldung“, interaktiv, ohne erhöhte Rechte). Nur in der interaktiven Sitzung erreichen Tastenkombinationen die Fenster des Benutzers. `CopperDeckHelper.exe run` ist der Launcher: startet node ohne Konsolenfenster und startet ihn nach einem Ende neu (wie KeepAlive bei launchd). Ein Mutex verhindert zwei Instanzen.
+- **Admin-Kanal der CLI:** Named Pipe pro Benutzer statt Unix-Socket.
+- **Daten:** `%LOCALAPPDATA%\CopperDeck` (rechnerbezogen, nicht im Roaming-Profil, weil Zertifikat und Icons zum Rechner gehören).
+- **Plattform in der App:** `GET /api/platform` (ohne Anmeldung, damit schon Kopplungs- und Offline-Ansicht „PC“ sagen) und `platform` in der ready-Nachricht. Gibt nur „mac“ oder „windows“ preis.
+
+### App-Auswahl („Apps selber wählen“)
+- **Quelle:** `shell:AppsFolder` – dieselbe Liste wie das Startmenü bzw. `Get-StartApps`, inklusive Store-Apps. Die Kennung ist die **AppUserModelID**. Das Schemafeld heisst weiter `bundleId`, erlaubt aber jetzt auch AppUserModelIDs (`APP_ID_PATTERN`: keine Steuerzeichen, keine in Windows-Pfaden verbotenen Zeichen). Der Mac-Helper prüft weiterhin das strenge Bundle-ID-Muster.
+- **Gestartet wird nur, was im Katalog steht.** Eine ID vom Gerät wird nie als Pfad ausgeführt.
+- **Beliebiges Programm:** Ich habe bewusst **keine** Dateiauswahl vom iPhone aus gebaut. Sie würde es erlauben, vom Telefon aus beliebige Programme auf dem PC zu starten. Stattdessen legt `copper-deck add-app <exe>` lokal am PC eine Startmenü-Verknüpfung an; danach erscheint das Programm in der normalen Auswahl. Wer am PC sitzt, entscheidet also, was startbar ist.
+- **Icons:** `IShellItemImageFactory` (256 px mit Transparenz), Cache-Dateinamen als Hash, weil AppUserModelIDs `\ ! { }` enthalten.
+
+### Aktionen unter Windows
+- **App öffnen:** Läuft die App schon (Fenster eines Prozesses mit derselben .exe), wird es nach vorne geholt; sonst Start über `shell:AppsFolder\<ID>`. Windows erlaubt Hintergrundprozessen das Aktivieren nur eingeschränkt; der übliche Weg (kurzes Alt-Signal vor `SetForegroundWindow`) wird verwendet. Klappt es trotzdem nicht, meldet die App das.
+- **Tastenkombination:** `SendInput`. Modifier nach Lage auf der Tastatur: ⌘ = Win, ⌥ = Alt, ⌃ = Strg, ⇧ = Umschalt. So bleibt die Konfiguration im gleichen Format. Die App zeigt unter Windows „Strg, Alt, Umschalt, Win“ und belegt neue Kombinationen mit Strg vor. Buchstaben über `VkKeyScanW` (folgt dem Tastaturlayout).
+- **Emoji:** `SendInput` mit `KEYEVENTF_UNICODE` statt Zwischenablage. Einfacher und lässt die Zwischenablage unberührt.
+- **Fenster anordnen:** gleiche Aufteilung wie am Mac (1/2/3/4 Fenster), Arbeitsbereich des Bildschirms mit dem vordersten Fenster, unsichtbare Fensterränder von Windows 10/11 werden ausgeglichen.
+- **Stage Manager:** gibt es nicht. Die Aktion wird im Editor ausgeblendet (ausser eine Kachel verwendet sie schon) und meldet „nur am Mac“. Die Windows-Startbelegung hat an ihrer Stelle „Aufgabenansicht“ (Win+Tab).
+- **Administrator-Fenster:** Windows blockiert Eingaben in erhöhte Fenster (UIPI) ohne Fehlermeldung. Das native Programm prüft das vorher und die App nennt das Programm.
+- **Mitteilung:** Infobereich-Benachrichtigung (`NotifyIcon`), unter Windows 10/11 als normale Benachrichtigung. Ohne eigene AppUserModelID, daher ohne Eintrag in den Benachrichtigungseinstellungen.
+- **Bilder:** WIC über WPF (PNG, JPEG, WebP), statt sips.
+
+### Netzwerk
+- **mDNS:** Windows 10/11 meldet `<Computername>.local`. Ins Zertifikat kommen nur echte LAN-Adapter, keine virtuellen (Hyper-V, WSL, VPN).
+- **Firewall:** Ohne Adminrechte fragt Windows beim ersten Start; mit Adminrechten legt `install.ps1` eine Regel nur für TCP 7443 und private Netzwerke an. Öffentlich eingestufte Netze erkennt das Skript und gibt einen Hinweis.
+
+### Getestet und nicht getestet
+- **Getestet (auf dem Mac):** 15 neue Unit-Tests mit nachgebildetem Windows (Katalog, Icon-Cache, Aktionen, Fehlertexte, Startbelegung, ID-Prüfung); alle 48 Tests grün. App im Windows-Modus per Playwright angesehen. Mac-Regressionstest (`e2e-bar.mjs`) grün.
+- **Nicht getestet:** `CopperDeckHelper.cs` ist **nicht kompiliert**: Auf diesem Mac gibt es keinen C#-Compiler, und das Herunterladen eines .NET-SDK in den temporären Ordner wurde von der Rechteprüfung abgelehnt. `install.ps1` ist **nicht ausgeführt** (kein PowerShell hier). Beides ist der erste Schritt der Testcheckliste am PC.

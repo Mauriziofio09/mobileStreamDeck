@@ -4,6 +4,7 @@ import {
   type ClientMessage, type DeckConfig, type InstalledApp, type PermissionKind, type PermissionState, type ServerMessage, type TimerState,
 } from '@copper-deck/shared';
 import { AuthService } from './auth.service';
+import { PlatformService } from './platform.service';
 
 export type ConnState = 'unpaired' | 'connecting' | 'online' | 'offline';
 
@@ -39,6 +40,7 @@ interface PendingSave {
 @Injectable({ providedIn: 'root' })
 export class ConnectionService {
   private readonly auth = inject(AuthService);
+  private readonly platform = inject(PlatformService);
 
   readonly state = signal<ConnState>(this.auth.token() ? 'connecting' : 'unpaired');
   readonly config = signal<DeckConfig | null>(readCachedConfig());
@@ -102,13 +104,13 @@ export class ConnectionService {
 
   run(actionId: string): Promise<RunOutcome> {
     if (this.state() !== 'online' || !this.ws) {
-      return Promise.resolve({ ok: false, kind: 'offline', reason: 'Keine Verbindung zum Mac – Aktion wurde nicht ausgeführt.' });
+      return Promise.resolve({ ok: false, kind: 'offline', reason: `Keine Verbindung zum ${this.platform.host()} – Aktion wurde nicht ausgeführt.` });
     }
     const requestId = crypto.randomUUID();
     return new Promise<RunOutcome>((resolve) => {
       const timer = setTimeout(() => {
         this.pending.delete(requestId);
-        resolve({ ok: false, kind: 'timeout', reason: 'Keine Antwort vom Mac (Zeitüberschreitung).' });
+        resolve({ ok: false, kind: 'timeout', reason: `Keine Antwort vom ${this.platform.host()} (Zeitüberschreitung).` });
       }, REQUEST_TIMEOUT_MS);
       this.pending.set(requestId, { resolve, timer });
       this.sendRaw({ type: 'run', requestId, actionId });
@@ -121,13 +123,13 @@ export class ConnectionService {
    */
   saveConfig(next: DeckConfig, baseRevision: number): Promise<SaveOutcome> {
     if (this.state() !== 'online' || !this.ws) {
-      return Promise.resolve({ ok: false, reason: 'offline', message: 'Keine Verbindung zum Mac – Änderung nicht gespeichert.' });
+      return Promise.resolve({ ok: false, reason: 'offline', message: `Keine Verbindung zum ${this.platform.host()} – Änderung nicht gespeichert.` });
     }
     const requestId = crypto.randomUUID();
     return new Promise<SaveOutcome>((resolve) => {
       const timer = setTimeout(() => {
         this.pendingSaves.delete(requestId);
-        resolve({ ok: false, reason: 'timeout', message: 'Keine Antwort vom Mac – Änderung evtl. nicht gespeichert.' });
+        resolve({ ok: false, reason: 'timeout', message: `Keine Antwort vom ${this.platform.host()} – Änderung evtl. nicht gespeichert.` });
       }, REQUEST_TIMEOUT_MS);
       this.pendingSaves.set(requestId, { resolve, timer });
       this.sendRaw({ type: 'saveConfig', requestId, baseRevision, config: next });
@@ -165,6 +167,7 @@ export class ConnectionService {
         this.lastError.set(null);
         this.deviceName.set(msg.deviceName);
         this.helperVersion.set(msg.helperVersion);
+        if (msg.platform) this.platform.set(msg.platform);
         this.startHeartbeat();
         return;
       case 'config':
@@ -214,7 +217,7 @@ export class ConnectionService {
     this.ws = null;
     this.failPending();
     if (code === CLOSE.unauthorized || code === CLOSE.revoked) {
-      this.lastError.set(code === CLOSE.revoked ? 'Dieses Gerät wurde am Mac widerrufen.' : 'Kopplung ungültig. Bitte neu koppeln.');
+      this.lastError.set(code === CLOSE.revoked ? `Dieses Gerät wurde am ${this.platform.host()} widerrufen.` : 'Kopplung ungültig. Bitte neu koppeln.');
       this.forget();
       return;
     }

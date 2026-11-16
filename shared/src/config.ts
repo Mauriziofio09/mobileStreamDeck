@@ -11,6 +11,9 @@ export const TILES_PER_GROUP = 8 as const;
 
 export type TileColor = 'brown' | 'violet';
 
+/** Betriebssystem, auf dem der Helper läuft. */
+export type HostPlatform = 'mac' | 'windows';
+
 export type Modifier = 'command' | 'option' | 'control' | 'shift';
 
 
@@ -85,7 +88,11 @@ export interface DeckConfig {
   readonly dock: readonly DockItem[];
 }
 
-/** Infos zu einer installierten App, wie sie der Helper liefert. */
+/**
+ * Infos zu einer installierten App, wie sie der Helper liefert.
+ * `bundleId` ist die App-Kennung des Systems: macOS Bundle-ID (com.apple.Safari),
+ * Windows AppUserModelID aus dem Startmenü (MSEdge, Microsoft.WindowsCalculator_8wekyb3d8bbwe!App, …).
+ */
 export interface InstalledApp {
   readonly bundleId: string;
   readonly name: string;

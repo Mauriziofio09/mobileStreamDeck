@@ -19,11 +19,21 @@ export function sniffImage(buf: Buffer): 'png' | 'jpeg' | 'webp' | null {
 
 /**
  * Eigene Bilder für Kacheln. Nur PNG/JPEG/WebP (kein SVG), max. 2 MB.
- * Der Helper vergibt den Dateinamen und rechnet jedes Bild per sips in ein PNG (max. 512 px) um:
+ * Der Helper vergibt den Dateinamen und rechnet jedes Bild in ein PNG (max. 512 px) um (sips bzw. WIC):
  * das prüft, dass es wirklich dekodierbar ist, und entfernt Metadaten.
  */
+/** Dekodiert `src` und schreibt ein PNG (höchstens maxPx) nach `dst`; wirft bei ungültigem Bild. */
+export type ImageConverter = (src: string, dst: string, maxPx: number) => Promise<void>;
+
 export class MediaStore {
-  constructor(private readonly dir: string, private readonly exec: Exec) {}
+  private readonly convert: ImageConverter;
+
+  /** macOS: sips. Windows: CopperDeckHelper.exe convert-image (WIC), als `convert` übergeben. */
+  constructor(private readonly dir: string, exec: Exec, convert?: ImageConverter) {
+    this.convert = convert ?? (async (src, dst, maxPx) => {
+      await exec('/usr/bin/sips', ['-s', 'format', 'png', '-Z', String(maxPx), src, '--out', dst], { timeoutMs: 15_000 });
+    });
+  }
 
   async save(buf: Buffer): Promise<{ ok: true; file: string } | { ok: false; error: MediaError }> {
     if (buf.length > MEDIA_MAX_BYTES) return { ok: false, error: 'too_large' };
@@ -35,7 +45,7 @@ export class MediaStore {
     const file = `${id}.png`;
     try {
       await writeFile(tmp, buf, { mode: 0o600 });
-      await this.exec('/usr/bin/sips', ['-s', 'format', 'png', '-Z', '512', tmp, '--out', path.join(this.dir, file)], { timeoutMs: 15_000 });
+      await this.convert(tmp, path.join(this.dir, file), 512);
       const st = await stat(path.join(this.dir, file));
       if (st.size === 0) throw new Error('leer');
       return { ok: true, file };

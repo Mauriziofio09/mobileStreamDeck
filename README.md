@@ -1,6 +1,6 @@
 # Copper Deck
 
-Copper Deck macht iPhone und iPad zu einem Touch-Panel für deinen Mac, ähnlich einem Stream Deck. Du tippst eine Kachel an, und der Mac öffnet eine App oder einen Link, sendet eine Tastenkombination, fügt ein Emoji ein, ordnet Fenster an, schaltet Stage Manager um oder startet einen Timer.
+Copper Deck macht iPhone und iPad zu einem Touch-Panel für deinen Mac oder Windows-PC, ähnlich einem Stream Deck. Du tippst eine Kachel an, und der Mac (bzw. PC) öffnet eine App oder einen Link, sendet eine Tastenkombination, fügt ein Emoji ein, ordnet Fenster an, schaltet Stage Manager um oder startet einen Timer.
 
 ```
 iPhone / iPad (PWA, Vollbild)  ──WSS/HTTPS im WLAN──▶  Copper Deck Helper (Mac, launchd)
@@ -25,6 +25,7 @@ iPhone / iPad (PWA, Vollbild)  ──WSS/HTTPS im WLAN──▶  Copper Deck Hel
 15. [Deinstallation](#15-deinstallation)
 16. [Fehlerbehebung](#16-fehlerbehebung)
 17. [Entwicklung](#17-entwicklung)
+18. [Windows](#18-windows)
 
 ---
 
@@ -354,3 +355,68 @@ node --import tsx tools/make-assets.mts  # Icons und Splash-Screens neu erzeugen
 | `node tools/e2e-m5-update.mjs` | App-Update über den Service Worker (führt `install.sh` aus) |
 
 Getroffene Entscheidungen und Abwägungen stehen in [DECISIONS.md](DECISIONS.md).
+
+## 18. Windows
+
+Copper Deck läuft auch unter **Windows 10 und 11**. iPhone und iPad, App, Kopplung und Bearbeiten funktionieren gleich wie am Mac; die Unterschiede stehen hier.
+
+> **Stand:** Der Windows-Teil ist noch **nicht auf echtem Windows getestet**. Geprüft sind die Logik (Unit-Tests mit nachgebildetem Windows) und die Darstellung der App im Windows-Modus. Siehe Testcheckliste in DECISIONS.md.
+
+### Voraussetzungen
+In einer **PowerShell** (keine Administratorrechte nötig):
+
+```powershell
+winget install OpenJS.NodeJS.LTS
+winget install FiloSottile.mkcert
+winget install Git.Git
+# PowerShell schliessen und neu öffnen, damit node, mkcert und git gefunden werden
+mkcert -install                     # Root-CA anlegen (Windows fragt einmal nach)
+```
+
+### Installation
+```powershell
+git clone https://github.com/Mauriziofio09/mobileStreamDeck.git
+cd mobileStreamDeck
+powershell -ExecutionPolicy Bypass -File scripts\install.ps1
+```
+
+Das Skript baut Web-App und Helper, baut `CopperDeckHelper.exe` mit dem C#-Compiler, der in jedem Windows enthalten ist (.NET Framework 4.x), kopiert alles nach `%LOCALAPPDATA%\CopperDeck\runtime` und richtet die **Aufgabenplanung** ein: Der Helper startet bei jeder Anmeldung und nach einem Absturz neu. Danach weiter wie am Mac:
+
+1. **Zertifikat aufs iPhone/iPad:** `copper-deck ca` zeigt `rootCA.pem` im Explorer. AirDrop gibt es unter Windows nicht: per Mail an dich selbst, über OneDrive bzw. iCloud für Windows. Auf dem Gerät antippen, installieren und in den Zertifikatsvertrauenseinstellungen freigeben ([Abschnitt 3](#3-zertifikat-auf-iphone-und-ipad-vertrauen), ab Schritt 3).
+2. In Safari **`https://<computername>.local:7443`** öffnen (die genaue Adresse zeigt `install.ps1` am Ende) → Teilen → **Zum Home-Bildschirm**.
+3. `copper-deck pair` → Code in der App eingeben.
+
+### Firewall und Netzwerk
+- Windows fragt beim ersten Start nach **Node.js**: für **private Netzwerke** zulassen. Wird `install.ps1` in einer Administrator-PowerShell ausgeführt, legt es die Regel „Copper Deck“ (TCP 7443, privat) selbst an.
+- Ist das WLAN als **öffentlich** eingestuft, blockiert Windows eingehende Verbindungen. Zu Hause: Einstellungen → Netzwerk und Internet → WLAN → dein Netzwerk → Netzwerkprofil **Privat**.
+- Firmen- und Gäste-WLANs isolieren Geräte oft voneinander, siehe [Fehlerbehebung](#16-fehlerbehebung).
+
+### Unterschiede zum Mac
+| | Mac | Windows |
+|---|---|---|
+| **App-Auswahl** | alle Apps aus /Applications u. a. | alle Programme aus dem **Startmenü**, inkl. Store-Apps, mit Icons |
+| **Eigenes Programm** | – | `copper-deck add-app "C:\Pfad\Programm.exe" [Name]` legt eine Verknüpfung im Startmenü an; danach steht es in der App-Auswahl |
+| **App öffnen** | öffnet bzw. holt nach vorne | läuft die App schon, holt Copper Deck ihr Fenster nach vorne, sonst startet sie |
+| **Tastenkombination** | ⌘ ⌥ ⌃ ⇧ | **Strg, Alt, Umschalt, Win**. Buchstaben folgen dem Tastaturlayout (Schweizerdeutsch: Z/Y). |
+| **Emoji einfügen** | über die Zwischenablage | direkt als Unicode-Eingabe; die Zwischenablage bleibt unberührt |
+| **Fenster anordnen** | letzte 4 Fenster | ebenso, auf dem Bildschirm des vordersten Fensters |
+| **Stage Manager** | ja | gibt es nicht; die Startbelegung hat stattdessen **Aufgabenansicht** (Win+Tab) |
+| **Berechtigungen** | Bedienungshilfen, Automation, Mitteilungen | keine nötig |
+| **Mitteilung am Timer-Ende** | Mitteilungszentrale | Windows-Benachrichtigung |
+
+**Grenze unter Windows:** Läuft das Fenster im Vordergrund **als Administrator** (z. B. der Task-Manager oder eine Admin-PowerShell), lässt Windows keine Tastenkombinationen und Emojis von Copper Deck zu. Die App meldet das mit dem Namen des Programms.
+
+### Daten und Befehle
+- Daten, Zertifikat, Icons: `%LOCALAPPDATA%\CopperDeck\`, Logs: `%LOCALAPPDATA%\CopperDeck\Logs\` (`helper.log`, `launcher.log`)
+- `copper-deck status | pair | devices | revoke <id> | cert | ca | add-app | notify-test`
+- Neu starten: Aufgabenplanung → „Copper Deck Helper“ → Beenden/Ausführen, oder `CopperDeckHelper.exe stop` und `Start-ScheduledTask "Copper Deck Helper"`
+- Update: `git pull`, dann erneut `install.ps1`
+- Deinstallation: `powershell -ExecutionPolicy Bypass -File scripts\uninstall.ps1` (mit `-Purge` auch Daten, Kopplungen und Zertifikat)
+
+### Fehlerbehebung Windows
+- **„Ausführung von Skripts ist deaktiviert“:** das Skript wie oben mit `-ExecutionPolicy Bypass` starten.
+- **Seite lädt nicht, obwohl der Helper läuft:** Netzwerkprofil „Privat“? Firewall-Frage zu Node.js zugelassen? `Get-NetFirewallRule -DisplayName "Copper Deck"` zeigt die Regel.
+- **`<computername>.local` wird nicht gefunden:** Windows meldet den Namen per mDNS; manche Netze blockieren das. Computername prüfen mit `hostname`. Er darf nur Buchstaben, Ziffern und Bindestriche enthalten.
+- **Helper startet nicht:** `%LOCALAPPDATA%\CopperDeck\Logs\launcher.log` ansehen.
+- **csc.exe meldet Fehler:** Die Ausgabe von `install.ps1` aufbewahren; sie nennt Datei und Zeile im C#-Code.
+

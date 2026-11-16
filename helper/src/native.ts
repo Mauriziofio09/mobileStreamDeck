@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ExecError, type Exec } from './exec';
+import { IS_WINDOWS } from './platform';
 
 export const APP_NAME = 'Copper Deck Helper';
 export const BUNDLE_ID = 'ch.copperdeck.helper';
@@ -11,6 +12,11 @@ export const INSTALLED_APP = path.join(homedir(), 'Applications', `${APP_NAME}.a
 /** Pfad zum nativen Programm: vom Launcher gesetzt, sonst installiertes bzw. lokal gebautes Bundle. */
 export function resolveNativeBinary(env: NodeJS.ProcessEnv = process.env): string | null {
   const here = path.dirname(fileURLToPath(import.meta.url));
+  if (IS_WINDOWS) {
+    // Vom Launcher gesetzt bzw. neben dem Helper-Bundle (runtime\helper\) von install.ps1 abgelegt.
+    const win = [env['COPPER_DECK_NATIVE'], path.join(here, 'CopperDeckHelper.exe'), path.resolve(here, '../dist/windows/CopperDeckHelper.exe')];
+    return win.find((c): c is string => !!c && existsSync(c)) ?? null;
+  }
   const candidates = [
     env['COPPER_DECK_NATIVE'],
     path.join(INSTALLED_APP, 'Contents/MacOS/CopperDeckHelper'),

@@ -2,10 +2,13 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { DeviceInfo } from '@copper-deck/shared';
+import { defaultWindowsConfig, type DeviceInfo } from '@copper-deck/shared';
 import { ActionRunner } from './actions/runner';
 import { adminRequest, startAdminServer, type AdminRequest } from './admin';
-import { AppCatalog, suggestDock } from './apps';
+import { MacAppCatalog, suggestDock, type AppCatalog } from './apps';
+import { suggestDockWindows, WindowsAppCatalog } from './apps-windows';
+import { WindowsActions } from './actions/windows';
+import { HOST_NAME, IS_WINDOWS, PLATFORM } from './platform';
 import { ConfigStore } from './config-store';
 import { DeviceStore } from './devices';
 import { execFileSafe } from './exec';
@@ -50,9 +53,11 @@ async function serve(): Promise<void> {
 
   const native = new Native(execFileSafe, resolveNativeBinary());
   const context = process.env['COPPER_DECK_CONTEXT'] === 'app' ? 'app' : 'terminal';
-  if (!native.available) log('warn', 'Copper Deck Helper.app nicht gefunden – native Aktionen nicht verfügbar');
-  if (context === 'terminal') log('warn', 'Von Hand gestartet: macOS-Berechtigungen gelten fürs Terminal, nicht für den LaunchAgent');
-  const catalog = new AppCatalog(execFileSafe, { iconCache: paths.iconCache, nativeBinary: native.binary });
+  if (!native.available) log('warn', `${IS_WINDOWS ? 'CopperDeckHelper.exe' : 'Copper Deck Helper.app'} nicht gefunden – native Aktionen nicht verfügbar`);
+  if (context === 'terminal' && !IS_WINDOWS) log('warn', 'Von Hand gestartet: macOS-Berechtigungen gelten fürs Terminal, nicht für den LaunchAgent');
+  const catalog: AppCatalog = IS_WINDOWS
+    ? new WindowsAppCatalog(native, paths.iconCache)
+    : new MacAppCatalog(execFileSafe, { iconCache: paths.iconCache, nativeBinary: native.binary });
   const permissions = new PermissionMonitor(native, context);
   const timers = new TimerManager(path.join(paths.data, 'timer.json'), async (title, body) => {
     const r = await native.call(['notify', title, body], 15_000);
@@ -63,8 +68,13 @@ async function serve(): Promise<void> {
   const devices = new DeviceStore(paths.devices);
   await devices.load();
   const config = new ConfigStore(paths.config, paths.configBackup);
-  await config.load(async () =>
-    (await suggestDock(execFileSafe, catalog)).map((a) => ({ id: `d-${a.bundleId.replace(/[^A-Za-z0-9_-]/g, '-')}`.slice(0, 64), bundleId: a.bundleId, label: a.name })),
+  const dockId = (bundleId: string, i: number) => `d-${i + 1}-${bundleId.replace(/[^A-Za-z0-9_-]/g, '-')}`.slice(0, 64);
+  await config.load(
+    async () => {
+      const apps = IS_WINDOWS ? await suggestDockWindows(catalog) : await suggestDock(execFileSafe, catalog as MacAppCatalog);
+      return apps.map((a, i) => ({ id: dockId(a.bundleId, i), bundleId: a.bundleId, label: a.name.slice(0, 40) }));
+    },
+    IS_WINDOWS ? async (dock) => defaultWindowsConfig(await catalog.list(), dock) : undefined,
   );
   const pairing = new PairingManager();
   const origins = [`https://${host.mdnsName}:${settings.port}`, `https://localhost:${settings.port}`];
@@ -73,10 +83,19 @@ async function serve(): Promise<void> {
     ?? path.resolve(here, '../../web/dist/web/browser');
 
   const readTls = async () => ({ key: await readFile(paths.key), cert: await readFile(paths.cert) });
-  const runner = new ActionRunner({ exec: execFileSafe, native, timers, permissions, keystrokeScript: resolveScript('keystroke'), activateScript: resolveScript('activate') });
+  const runner = new ActionRunner({
+    exec: execFileSafe, native, timers, permissions, keystrokeScript: resolveScript('keystroke'), activateScript: resolveScript('activate'),
+    ...(IS_WINDOWS ? { windows: new WindowsActions(native, catalog) } : {}),
+  });
+  const media = IS_WINDOWS
+    ? new MediaStore(path.join(paths.data, 'media'), execFileSafe, async (src, dst, maxPx) => {
+        const r = await native.call(['convert-image', src, dst, String(maxPx)], 15_000);
+        if (!r.ok) throw new Error(String(r.error ?? 'convert-image fehlgeschlagen'));
+      })
+    : new MediaStore(path.join(paths.data, 'media'), execFileSafe);
   const srv = createServer({
     devices, pairing, config, catalog, runner, timers, permissions,
-    media: new MediaStore(path.join(paths.data, 'media'), execFileSafe),
+    media,
     origins, webRoot, tls: await readTls(), version: VERSION,
   });
 
@@ -117,7 +136,7 @@ async function serve(): Promise<void> {
     srv.server.once('error', reject);
     srv.server.listen(settings.port, '0.0.0.0', () => resolve());
   });
-  log('info', `Copper Deck ${VERSION} läuft: ${origins[0]}`, { ips: host.lanIps, webRoot, context, native: native.binary });
+  log('info', `Copper Deck ${VERSION} läuft: ${origins[0]}`, { platform: PLATFORM, ips: host.lanIps, webRoot, context, native: native.binary });
 
   // Berechtigungen: Systemdialoge nur beim ersten Start im App-Kontext zeigen, danach still prüfen.
   if (native.available) {
@@ -135,7 +154,7 @@ async function serve(): Promise<void> {
     log('info', `Beende (${sig})`);
     // Admin-Socket zuerst schliessen, damit ein Nachfolger sofort starten kann.
     admin.close();
-    void rm(paths.adminSocket, { force: true })
+    void (IS_WINDOWS ? Promise.resolve() : rm(paths.adminSocket, { force: true }))
       .then(() => srv.close())
       .finally(() => process.exit(0));
     setTimeout(() => process.exit(0), 3000).unref();
@@ -147,7 +166,7 @@ async function serve(): Promise<void> {
 async function cli(cmd: string, args: string[]): Promise<void> {
   const call = (req: AdminRequest) =>
     adminRequest(paths.adminSocket, req).catch((e: Error) => {
-      throw new Error(`Helper nicht erreichbar (${e.message}). Läuft er? Start: copper-deck serve`);
+      throw new Error(`Helper nicht erreichbar (${e.message}). Läuft er? Start: copper-deck serve (${HOST_NAME})`);
     });
 
   switch (cmd) {
@@ -179,7 +198,9 @@ async function cli(cmd: string, args: string[]): Promise<void> {
     }
     case 'notify-test': {
       const r = (await call({ cmd: 'notifyTest' })) as { ok: boolean; status?: string };
-      process.stdout.write(r.ok ? 'Testmitteilung gesendet.\n' : `Mitteilung nicht möglich (${r.status ?? 'Fehler'}). Systemeinstellungen → Mitteilungen → „Copper Deck Helper“.\n`);
+      process.stdout.write(r.ok ? 'Testmitteilung gesendet.\n' : IS_WINDOWS
+        ? 'Mitteilung nicht möglich. Einstellungen → System → Benachrichtigungen prüfen (auch „Nicht stören“).\n'
+        : `Mitteilung nicht möglich (${r.status ?? 'Fehler'}). Systemeinstellungen → Mitteilungen → „Copper Deck Helper“.\n`);
       return;
     }
     case 'permissions': {
@@ -201,8 +222,26 @@ async function cli(cmd: string, args: string[]): Promise<void> {
     }
     case 'ca': {
       const file = await caRootFile(execFileSafe);
-      process.stdout.write(`mkcert-Root-CA: ${file}\nFinder zeigt die Datei – per AirDrop an iPhone/iPad senden.\n`);
-      await execFileSafe('/usr/bin/open', ['-R', file]);
+      if (IS_WINDOWS) {
+        process.stdout.write(`mkcert-Root-CA: ${file}\nDer Explorer zeigt die Datei – per Mail, OneDrive/iCloud oder Kabel aufs iPhone/iPad bringen.\n`);
+        // explorer.exe meldet auch bei Erfolg Exit-Code 1.
+        await execFileSafe('explorer.exe', [`/select,${file}`]).catch(() => undefined);
+      } else {
+        process.stdout.write(`mkcert-Root-CA: ${file}\nFinder zeigt die Datei – per AirDrop an iPhone/iPad senden.\n`);
+        await execFileSafe('/usr/bin/open', ['-R', file]);
+      }
+      return;
+    }
+    case 'add-app': {
+      // Nur Windows: beliebiges Programm über eine Startmenü-Verknüpfung in die App-Auswahl bringen.
+      if (!IS_WINDOWS) throw new Error('add-app gibt es nur unter Windows. Am Mac erscheinen alle Apps aus /Applications automatisch.');
+      const [target, ...nameParts] = args;
+      if (!target) throw new Error('Aufruf: copper-deck add-app <Pfad zur .exe> [Name]');
+      const name = nameParts.join(' ') || path.basename(target, path.extname(target));
+      const native = new Native(execFileSafe, resolveNativeBinary());
+      const r = await native.call(['create-shortcut', path.resolve(target), name]);
+      if (!r.ok) throw new Error(String(r.error ?? 'Verknüpfung nicht erstellt'));
+      process.stdout.write(`Verknüpfung erstellt: ${String(r['shortcut'])}\n„${name}“ erscheint in der App-Auswahl (spätestens nach einer Minute).\n`);
       return;
     }
     case 'cert-status': {
@@ -214,14 +253,16 @@ async function cli(cmd: string, args: string[]): Promise<void> {
     default:
       process.stdout.write(
         'Copper Deck Helper\n\n' +
-          '  copper-deck serve            Helper starten (macht später der LaunchAgent)\n' +
+          `  copper-deck serve            Helper starten (macht sonst ${IS_WINDOWS ? 'die Aufgabenplanung' : 'der LaunchAgent'})\n` +
           '  copper-deck pair             Kopplungscode anzeigen\n' +
           '  copper-deck devices          Gekoppelte Geräte auflisten\n' +
           '  copper-deck revoke <id>      Gerät widerrufen\n' +
           '  copper-deck cert [--renew]   TLS-Zertifikat prüfen/erneuern\n' +
-          '  copper-deck ca               mkcert-Root-CA im Finder zeigen\n' +
+          `  copper-deck ca               mkcert-Root-CA im ${IS_WINDOWS ? 'Explorer' : 'Finder'} zeigen\n` +
           '  copper-deck status           Status des laufenden Helpers\n' +
-          '  copper-deck permissions      macOS-Berechtigungen prüfen\n' +
+          (IS_WINDOWS
+            ? '  copper-deck add-app <exe> [Name]  Programm in die App-Auswahl aufnehmen\n'
+            : '  copper-deck permissions      macOS-Berechtigungen prüfen\n') +
           '  copper-deck notify-test      Testmitteilung senden\n',
       );
   }

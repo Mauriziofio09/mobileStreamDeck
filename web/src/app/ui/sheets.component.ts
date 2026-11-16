@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import type { DeviceInfo } from '@copper-deck/shared';
 import { ActionService } from '../core/action.service';
+import { PlatformService } from '../core/platform.service';
 import { UpdateService } from '../core/update.service';
 import { APP_VERSION, BUILD_TIME } from '../../version';
 import { AuthService } from '../core/auth.service';
@@ -22,14 +23,14 @@ import { TIMER_LABEL, TIMER_MINUTES, TimerService } from '../core/timer.service'
         <div class="sheet" cdSurface="sheet" [cdRadius]="0.14" (click)="$event.stopPropagation()">
           @if (store.sheet() === 'about') {
             <h2>Copper Deck</h2>
-            <p class="sub">Touch-Panel für deinen Mac</p>
+            <p class="sub">Touch-Panel für deinen {{ platform.host() }}</p>
             <dl>
               <dt>Verbindung</dt>
               <dd class="status" [attr.data-state]="conn.state()">
                 <span class="dot"></span>{{ stateText() }}
               </dd>
               @if (conn.lastError(); as e) { <dt></dt><dd class="err">{{ e }}</dd> }
-              <dt>Mac</dt>
+              <dt>{{ platform.host() }}</dt>
               <dd>{{ host }}</dd>
               <dt>Dieses Gerät</dt>
               <dd>{{ conn.deviceName() || '–' }}</dd>
@@ -58,7 +59,10 @@ import { TIMER_LABEL, TIMER_MINUTES, TimerService } from '../core/timer.service'
                 <p class="sub">Lade …</p>
               }
             }
-            @if (conn.permissions(); as p) {
+            @if (platform.isWindows()) {
+              <h3>Hinweis für Windows</h3>
+              <p class="hint">Windows braucht keine Berechtigungen. Nur Fenster, die als Administrator laufen, nehmen keine Tastenkombinationen und Emojis von Copper Deck an.</p>
+            } @else if (conn.permissions(); as p) {
               <h3>Berechtigungen am Mac</h3>
               @if (p.context === 'terminal') {
                 <p class="notice">Der Helper läuft von Hand im Terminal. Berechtigungen gelten dann fürs Terminal, nicht für den LaunchAgent.</p>
@@ -118,6 +122,7 @@ export class SheetsComponent {
   private readonly auth = inject(AuthService);
   private readonly actions = inject(ActionService);
   protected readonly updates = inject(UpdateService);
+  protected readonly platform = inject(PlatformService);
   protected readonly appVersion = APP_VERSION;
   protected readonly buildTime = new Date(BUILD_TIME).toLocaleString('de-CH', { dateStyle: 'short', timeStyle: 'short' });
 

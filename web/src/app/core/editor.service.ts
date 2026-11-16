@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { TILES_PER_GROUP, type DeckConfig, type DockItem, type EmojiItem, type Tile, type TileGroup } from '@copper-deck/shared';
 import { ConnectionService } from './connection.service';
 import { DeckStore } from './deck.store';
+import { PlatformService } from './platform.service';
 
 /** Obergrenzen wie im Schema des Helpers. */
 export const MAX_EMOJIS = 16;
@@ -32,6 +33,7 @@ export const newId = (prefix: 't' | 'g' | 'e' | 'd'): string =>
 export class EditorService {
   private readonly conn = inject(ConnectionService);
   private readonly store = inject(DeckStore);
+  private readonly platform = inject(PlatformService);
   private chain: Promise<unknown> = Promise.resolve();
   /** Kachel, die gerade im Editor offen ist (null = neu an diesem Platz). */
   readonly editing = signal<{ slot: Slot; tile: Tile | null } | null>(null);
@@ -130,7 +132,7 @@ export class EditorService {
 
   private apply(mutate: (cfg: DeckConfig) => DeckConfig): void {
     if (!this.conn.online()) {
-      this.store.toast('Keine Verbindung zum Mac – Bearbeiten ist gerade nicht möglich.', 'error');
+      this.store.toast(`Keine Verbindung zum ${this.platform.host()} – Bearbeiten ist gerade nicht möglich.`, 'error');
       return;
     }
     const current = this.store.config();

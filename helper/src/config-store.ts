@@ -18,7 +18,8 @@ export class ConfigStore {
 
   constructor(private readonly file: string, private readonly backup: string) {}
 
-  async load(makeDock: () => Promise<DockItem[]>): Promise<DeckConfig> {
+  /** `makeDefault` erzeugt die Startbelegung (macOS bzw. Windows), wenn noch keine config.json existiert. */
+  async load(makeDock: () => Promise<DockItem[]>, makeDefault: (dock: DockItem[]) => DeckConfig | Promise<DeckConfig> = defaultConfig): Promise<DeckConfig> {
     const raw = await readJson(this.file);
     if (raw !== undefined) {
       const parsed = deckConfigSchema.safeParse(raw);
@@ -35,7 +36,7 @@ export class ConfigStore {
       }
       throw new Error(`config.json und Backup sind ungültig (${this.file}). Datei prüfen oder löschen, um die Startbelegung neu anzulegen.`);
     }
-    this.current = deckConfigSchema.parse(defaultConfig(await makeDock())) as DeckConfig;
+    this.current = deckConfigSchema.parse(await makeDefault(await makeDock())) as DeckConfig;
     await this.write(this.current, false);
     log('info', 'Startbelegung angelegt');
     return this.current;

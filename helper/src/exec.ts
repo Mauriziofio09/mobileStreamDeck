@@ -25,7 +25,7 @@ export const execFileSafe: Exec = (file, args, opts = {}) =>
     execFile(
       file,
       [...args],
-      { timeout: opts.timeoutMs ?? 10_000, maxBuffer: 4 * 1024 * 1024, shell: false, env: process.env },
+      { timeout: opts.timeoutMs ?? 10_000, maxBuffer: 4 * 1024 * 1024, shell: false, env: process.env, windowsHide: true },
       (err, stdout, stderr) => {
         if (err) {
           const e = err as NodeJS.ErrnoException & { killed?: boolean; code?: number | string };

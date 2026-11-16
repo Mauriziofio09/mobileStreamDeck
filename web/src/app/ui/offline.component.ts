@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { ConnectionService } from '../core/connection.service';
+import { PlatformService } from '../core/platform.service';
 import { SurfaceDirective } from '../core/surface.directive';
 import { IconComponent } from './icons';
 
@@ -11,12 +12,12 @@ import { IconComponent } from './icons';
   template: `
     <div class="panel" cdSurface="sheet" [cdRadius]="0.1">
       <span class="icon"><cd-icon name="offline" /></span>
-      <h1>Mac nicht erreichbar</h1>
+      <h1>{{ platform.host() }} nicht erreichbar</h1>
       <p>{{ conn.state() === 'connecting' ? 'Verbinde …' : 'Neuer Versuch läuft automatisch.' }}</p>
       <ul>
-        <li>Ist der Mac wach und im selben WLAN?</li>
+        <li>Ist der {{ platform.host() }} wach und im selben WLAN?</li>
         <li>Läuft der Copper-Deck-Helper? (<code>copper-deck status</code>)</li>
-        <li>Lässt die macOS-Firewall Verbindungen zu?</li>
+        <li>Lässt die {{ platform.isWindows() ? 'Windows' : 'macOS' }}-Firewall Verbindungen zu?</li>
       </ul>
       <button type="button" cdSurface="tile-brown" [cdRadius]="0.3" (click)="conn.connect()">Erneut versuchen</button>
     </div>
@@ -38,4 +39,5 @@ import { IconComponent } from './icons';
 })
 export class OfflineComponent {
   protected readonly conn = inject(ConnectionService);
+  protected readonly platform = inject(PlatformService);
 }

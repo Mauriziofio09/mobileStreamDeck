@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import type { DeckConfig, TileGroup } from '@copper-deck/shared';
 import { ConnectionService } from './connection.service';
 import { LayoutService } from './layout.service';
+import { PlatformService } from './platform.service';
 
 export type Sheet = 'none' | 'about' | 'timer';
 
@@ -16,6 +17,7 @@ export interface Toast {
 export class DeckStore {
   private readonly layoutService = inject(LayoutService);
   private readonly conn = inject(ConnectionService);
+  private readonly platform = inject(PlatformService);
 
   /** Aktuelle Konfiguration vom Helper (bzw. zuletzt bekannte, wenn offline). */
   readonly config = computed<DeckConfig>(() => this.conn.config() ?? EMPTY_CONFIG);
@@ -60,7 +62,7 @@ export class DeckStore {
   /** Langes Drücken: Bearbeitungsmodus starten (nur mit Verbindung). */
   enterEditMode(): void {
     if (!this.conn.online()) {
-      this.toast('Bearbeiten ist nur mit Verbindung zum Mac möglich.', 'error');
+      this.toast(`Bearbeiten ist nur mit Verbindung zum ${this.platform.host()} möglich.`, 'error');
       return;
     }
     this.editMode.set(true);
