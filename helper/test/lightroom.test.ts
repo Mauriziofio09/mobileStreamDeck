@@ -187,3 +187,67 @@ describe('Lightroom-Befehle prüfen', () => {
     assert.equal(new Set(LR_PARAM_IDS).size, LR_PARAM_IDS.length, 'keine doppelten Regler');
   });
 });
+
+// ---------------------------------------------------------------- Adobe Lightroom (Cloud-Version)
+import { LR_CLOUD_COMMANDS } from '@copper-deck/shared';
+import { LightroomCloud, LR_CLOUD } from '../src/lightroom-cloud';
+import { ExecError, type Exec } from '../src/exec';
+
+describe('Lightroom (Cloud) über das Menü', () => {
+  function setup(fail?: (args: readonly string[]) => string | null) {
+    const calls: (readonly string[])[] = [];
+    const runs: unknown[] = [];
+    const exec: Exec = async (_f, args) => {
+      calls.push(args);
+      const err = fail?.(args);
+      if (err) throw new ExecError('osascript', 1, err, false);
+      return { stdout: 'ok', stderr: '' };
+    };
+    const catalog = { get: async (id: string) => (id === 'com.adobe.mas.lightroomCC' ? { bundleId: id, name: 'Adobe Lightroom' } : null), list: async () => [] } as never;
+    const runner = { run: async (a: unknown) => { runs.push(a); return { ok: true }; } } as never;
+    const permissions = { report: () => undefined } as never;
+    return { lc: new LightroomCloud({ exec, catalog, runner, permissions, menuScript: '/m.applescript' }), calls, runs };
+  }
+
+  test('jeder Befehl hat einen Menüeintrag', () => {
+    for (const c of LR_CLOUD_COMMANDS) assert.ok(LR_CLOUD[c]?.mac, c);
+    assert.equal(Object.keys(LR_CLOUD).length, LR_CLOUD_COMMANDS.length);
+  });
+
+  test('Sterne über den Kurzbefehl im Menü Foto, Navigation über den Namen', async () => {
+    const { lc, calls } = setup();
+    assert.deepEqual(await lc.run('rating3'), { ok: true });
+    assert.deepEqual(calls.at(-1), ['/m.applescript', 'com.adobe.mas.lightroomCC', '5', 'key', '3', '8']);
+    await lc.run('next');
+    assert.deepEqual(calls.at(-1), ['/m.applescript', 'com.adobe.mas.lightroomCC', '4', 'name', 'Nächstes Foto|Next Photo', '-']);
+    await lc.run('labelPurple');
+    assert.deepEqual(calls.at(-1)!.slice(3), ['name', 'Lila|Purple', 'Farbbeschriftung festlegen|Set Color Label']);
+  });
+
+  test('Lightroom läuft nicht: starten und einmal wiederholen', async () => {
+    let first = true;
+    const { lc, calls, runs } = setup(() => (first ? ((first = false), 'execution error: not_running (9001)') : null));
+    const t = Date.now();
+    assert.deepEqual(await lc.run('grid'), { ok: true });
+    assert.equal(calls.length, 2);
+    assert.deepEqual(runs[0], { type: 'openApp', bundleId: 'com.adobe.mas.lightroomCC' });
+    assert.ok(Date.now() - t >= 3900, 'wartet, bis Lightroom bereit ist');
+  });
+
+  test('verständliche Fehler: nicht möglich, nicht gefunden, Bedienungshilfen', async () => {
+    assert.match((await setup(() => 'disabled (9003)').lc.run('crop') as { message: string }).message, /gerade nicht möglich/);
+    assert.match((await setup(() => 'not_found (9002)').lc.run('beforeAfter') as { message: string }).message, /nicht im Menü/);
+    assert.match((await setup(() => 'System Events got an error: osascript is not allowed assistive access. (-1719)').lc.run('pick') as { message: string }).message, /Bedienungshilfen/);
+  });
+
+  test('ohne Lightroom: klare Meldung, kein Aufruf', async () => {
+    const calls: unknown[] = [];
+    const lc = new LightroomCloud({
+      exec: async (...a) => { calls.push(a); return { stdout: '', stderr: '' }; },
+      catalog: { get: async () => null, list: async () => [] } as never,
+      runner: {} as never, permissions: {} as never, menuScript: '/m',
+    });
+    assert.match((await lc.run('auto') as { message: string }).message, /nicht installiert/);
+    assert.equal(calls.length, 0);
+  });
+});

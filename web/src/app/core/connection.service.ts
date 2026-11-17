@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import {
   CLOSE, LR_EMPTY_STATE, PROTOCOL_VERSION, WS_PATH,
-  type ClientMessage, type LrCommand, type LrPresetFolder, type LrState, type DeckConfig, type InstalledApp, type PermissionKind, type PermissionState, type ServerMessage, type TimerState,
+  type ClientMessage, type LrCloudCommand, type LrCommand, type LrPresetFolder, type LrState, type DeckConfig, type InstalledApp, type PermissionKind, type PermissionState, type ServerMessage, type TimerState,
 } from '@copper-deck/shared';
 import { AuthService } from './auth.service';
 import { PlatformService } from './platform.service';
@@ -58,6 +58,8 @@ export class ConnectionService {
   /** Lightroom Classic (über das Plugin am Mac/PC). */
   readonly lightroom = signal<LrState>(LR_EMPTY_STATE);
   readonly lrPresets = signal<readonly LrPresetFolder[]>([]);
+  /** Adobe Lightroom (Cloud-Version) ist am Rechner installiert. */
+  readonly lightroomCloud = signal(false);
   /** Letzte vom Helper bestätigte Revision (Basis für Änderungen). */
   readonly serverRevision = signal<number>(this.config()?.revision ?? 0);
   /** Zuletzt vom Helper bestätigte Konfiguration (zum Zurücksetzen bei Ablehnung). */
@@ -123,8 +125,17 @@ export class ConnectionService {
     });
   }
 
+  /** Befehl an Adobe Lightroom (Cloud-Version); Antwort wie bei lr(). */
+  lrc(command: LrCloudCommand): Promise<{ ok: boolean; message?: string }> {
+    return this.lrSend({ type: 'lrc', requestId: '', command });
+  }
+
   /** Lightroom-Befehl; Antwort vom Plugin (über den Helper) oder Zeitüberschreitung. */
   lr(command: LrCommand): Promise<{ ok: boolean; message?: string }> {
+    return this.lrSend({ type: 'lr', requestId: '', command });
+  }
+
+  private lrSend(msg: Extract<ClientMessage, { type: 'lr' | 'lrc' }>): Promise<{ ok: boolean; message?: string }> {
     if (this.state() !== 'online' || !this.ws) {
       return Promise.resolve({ ok: false, message: `Keine Verbindung zum ${this.platform.host()}.` });
     }
@@ -135,7 +146,7 @@ export class ConnectionService {
         resolve({ ok: false, message: 'Keine Antwort von Lightroom (Zeitüberschreitung).' });
       }, REQUEST_TIMEOUT_MS);
       this.pendingLr.set(requestId, { resolve, timer });
-      this.sendRaw({ type: 'lr', requestId, command });
+      this.sendRaw({ ...msg, requestId });
     });
   }
 
@@ -191,6 +202,7 @@ export class ConnectionService {
         this.helperVersion.set(msg.helperVersion);
         if (msg.platform) this.platform.set(msg.platform);
         this.tailscaleUrl.set(msg.tailscaleUrl ?? null);
+        this.lightroomCloud.set(msg.lightroomCloud === true);
         this.startHeartbeat();
         return;
       case 'config':

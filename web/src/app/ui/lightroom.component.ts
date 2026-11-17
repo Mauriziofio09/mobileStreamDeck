@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { LR_PARAMS, type LrFlag, type LrLabel, type LrPanel, type LrParamDef } from '@copper-deck/shared';
+import { LR_PARAMS, type LrCloudCommand, type LrFlag, type LrLabel, type LrPanel, type LrParamDef } from '@copper-deck/shared';
 import { confirmRemoval } from '../core/confirm';
 import { LightroomService } from '../core/lightroom.service';
 import { PlatformService } from '../core/platform.service';
@@ -29,6 +29,38 @@ const LABELS: readonly { id: Exclude<LrLabel, 'none'>; name: string; color: stri
 
 const TAB_KEY = 'copperdeck.lr.tab';
 
+interface CloudButton { readonly cmd: LrCloudCommand; readonly label: string; readonly primary?: boolean; readonly confirm?: boolean; readonly success?: string }
+
+/** Adobe Lightroom (Cloud): Schaltflächen nach Bereich, entsprechen den Menüeinträgen von Lightroom. */
+const CLOUD_GROUPS: readonly { title: string; items: readonly CloudButton[] }[] = [
+  { title: 'Ansicht', items: [
+    { cmd: 'grid', label: 'Raster' }, { cmd: 'detail', label: 'Einzelbild' },
+    { cmd: 'original', label: 'Original zeigen' }, { cmd: 'beforeAfter', label: 'Vorher/Nachher' },
+  ] },
+  { title: 'Bearbeiten', items: [
+    { cmd: 'edit', label: 'Bearbeiten' }, { cmd: 'panelLight', label: 'Licht' }, { cmd: 'panelColor', label: 'Farbe' },
+    { cmd: 'panelEffects', label: 'Effekte' }, { cmd: 'panelDetail', label: 'Details' }, { cmd: 'panelOptics', label: 'Optik' },
+    { cmd: 'panelGeometry', label: 'Geometrie' }, { cmd: 'profiles', label: 'Profile' }, { cmd: 'presets', label: 'Presets' },
+  ] },
+  { title: 'Werkzeuge', items: [
+    { cmd: 'crop', label: 'Zuschneiden' }, { cmd: 'heal', label: 'Entfernen' }, { cmd: 'mask', label: 'Maskieren' },
+    { cmd: 'auto', label: 'Auto' },
+  ] },
+  { title: 'Einstellungen und Export', items: [
+    { cmd: 'copy', label: 'Kopieren', success: 'Bearbeitungseinstellungen kopiert.' },
+    { cmd: 'paste', label: 'Einfügen', success: 'Bearbeitungseinstellungen eingefügt.' },
+    { cmd: 'resetEdits', label: 'Zurücksetzen', confirm: true, success: 'Bearbeitungen zurückgesetzt.' },
+    { cmd: 'exportDialog', label: 'Exportieren…' },
+    { cmd: 'exportPrevious', label: 'Wie vorher exportieren', primary: true, success: 'Export gestartet.' },
+  ] },
+];
+
+const CLOUD_LABELS: readonly { cmd: LrCloudCommand; name: string; color: string }[] = [
+  { cmd: 'labelRed', name: 'Rot', color: '#e5484d' }, { cmd: 'labelYellow', name: 'Gelb', color: '#e9c53a' },
+  { cmd: 'labelGreen', name: 'Grün', color: '#46a758' }, { cmd: 'labelBlue', name: 'Blau', color: '#3e63dd' },
+  { cmd: 'labelPurple', name: 'Lila', color: '#8e4ec6' },
+];
+
 /** Lightroom-Classic-Ansicht: Foto, Bewertung, Markierung, Navigation, Regler, Vorgaben, Schnellaktionen. */
 @Component({
   selector: 'cd-lightroom',
@@ -44,6 +76,8 @@ export class LightroomComponent {
   protected readonly tabs = TABS;
   protected readonly labels = LABELS;
   protected readonly stars = [1, 2, 3, 4, 5] as const;
+  protected readonly cloudGroups = CLOUD_GROUPS;
+  protected readonly cloudLabels = CLOUD_LABELS;
   protected readonly tab = signal<Tab>(readTab());
   protected readonly hslMode = signal<'Farbton' | 'Sättigung' | 'Luminanz'>('Farbton');
   protected readonly openFolders = signal<ReadonlySet<string>>(new Set());
@@ -94,6 +128,11 @@ export class LightroomComponent {
 
   protected resetAll(): void {
     if (confirmRemoval('lr-resetall', 'Alle Entwicklungseinstellungen')) void this.lr.run({ cmd: 'resetall' }, 'Einstellungen zurückgesetzt.');
+  }
+
+  protected cloudTap(b: CloudButton): void {
+    if (b.confirm && !confirmRemoval(`lrc-${b.cmd}`, 'Alle Bearbeitungen dieses Fotos')) return;
+    void this.lr.cloud(b.cmd, b.success);
   }
 
   protected toggleFolder(name: string): void {

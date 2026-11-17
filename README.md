@@ -427,11 +427,20 @@ Das Skript baut Web-App und Helper, baut `CopperDeckHelper.exe` mit dem C#-Compi
 
 ## 19. Lightroom Classic
 
-Der Tab **LR** (Pille rechts bzw. unten) macht iPhone und iPad zu einem Bedienpult für **Lightroom Classic** (ab Version 10) auf dem Mac oder PC.
+Der Tab **LR** (Pille rechts bzw. unten) macht iPhone und iPad zu einem Bedienpult für **Lightroom Classic** (ab Version 10) auf dem Mac oder PC – mit allen Reglern. Für das normale **Adobe Lightroom** (Cloud-Version) gibt es eine Schaltflächen-Ansicht ohne Regler, siehe unten.
 
 > **Stand:** Das Lightroom-Plugin ist **noch nicht in echtem Lightroom getestet** (hier ist Lightroom Classic nicht installiert). Geprüft ist der ganze Weg App → Helper → Plugin-Schnittstelle mit einem nachgebildeten Plugin (`tools/fake-lightroom.mjs`).
 
-### Einrichtung
+### Adobe Lightroom (Cloud-Version)
+
+Ist statt Classic das normale **Adobe Lightroom** installiert, zeigt der Tab **LR** Schaltflächen dafür. Eine Plugin-Schnittstelle gibt es dort nicht, und das Fenster gibt seine Regler nicht für die Bedienungshilfen frei. Copper Deck wählt deshalb die **Menüeinträge** von Lightroom aus (am Mac). Das klappt unabhängig von der Sprache, weil es die Einträge an ihrem Kurzbefehl erkennt.
+
+- **Geht:** vorheriges/nächstes Foto, Sterne 0–5, Markiert/Abgelehnt/Unmarkiert, Farbbeschriftungen, Raster/Einzelbild, Original zeigen, Vorher/Nachher, Bedienfelder (Bearbeiten, Licht, Farbe, Effekte, Details, Optik, Geometrie, Profile, Presets), Zuschneiden, Entfernen, Maskieren, Auto, Einstellungen kopieren/einfügen, Rückgängig/Wiederholen, Bearbeitungen zurücksetzen, Exportieren…, Wie vorher exportieren.
+- **Geht nicht:** Regler auf Werte setzen, Anzeige von Foto, Sternen und Werten in der App, einzelne Presets auswählen. Dafür braucht es Lightroom Classic.
+- **Wichtig:** Sterne und Markierungen gelten für das **ausgewählte** Foto. In der Rasteransicht vorher ein Foto auswählen.
+- **Windows:** Dort sendet Copper Deck die Kurzbefehle von Lightroom (Strg statt ⌘). Noch nicht auf echtem Windows getestet.
+
+### Einrichtung Lightroom Classic
 1. Lightroom Classic installieren (Creative Cloud).
 2. `scripts/install.sh` (Mac) bzw. `scripts\install.ps1` (Windows) erneut ausführen. Das Skript legt das Plugin in den **Modules**-Ordner von Lightroom:
    - Mac: `~/Library/Application Support/Adobe/Lightroom/Modules/CopperDeck.lrplugin`

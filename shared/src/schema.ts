@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { CONFIG_SCHEMA_VERSION, HOTKEY_KEYS, MODIFIERS, TILES_PER_GROUP } from './config';
 import { ID_PATTERN } from './protocol';
-import { LR_PARAM_IDS } from './lightroom';
+import { LR_CLOUD_COMMANDS, LR_PARAM_IDS } from './lightroom';
 
 const id = z.string().regex(ID_PATTERN);
 /** IDs in der Konfiguration: "sys-" ist für feste System-Aktionen reserviert. */
@@ -121,6 +121,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   // Inhalt wird im Helper gegen deckConfigSchema geprüft (mit verständlichen Fehlermeldungen).
   z.object({ type: z.literal('saveConfig'), requestId: id, baseRevision: z.number().int().nonnegative(), config: z.unknown() }).strict(),
   z.object({ type: z.literal('lr'), requestId: id, command: lrCommandSchema }).strict(),
+  z.object({ type: z.literal('lrc'), requestId: id, command: z.enum(LR_CLOUD_COMMANDS) }).strict(),
 ]);
 
 export const pairRequestSchema = z.object({

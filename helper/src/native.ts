@@ -27,7 +27,7 @@ export function resolveNativeBinary(env: NodeJS.ProcessEnv = process.env): strin
 }
 
 /** AppleScript-Dateien: neben dem Bundle (runtime/helper/) oder im Quellbaum (helper/native/). */
-export function resolveScript(name: 'keystroke' | 'activate'): string {
+export function resolveScript(name: 'keystroke' | 'activate' | 'lightroom-menu'): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const candidates = [path.join(here, `${name}.applescript`), path.resolve(here, `../native/${name}.applescript`)];
   return candidates.find((c) => existsSync(c)) ?? candidates[1]!;

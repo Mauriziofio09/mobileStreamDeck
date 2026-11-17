@@ -391,3 +391,30 @@ Hier steht, was ich selbst entschieden habe. Neue Einträge kommen jeweils unten
 - **Deploy wie photoAI:** gleicher Server, gleicher Caddy, eigener read-only nginx-Container für beide Hostnamen.
 - **DNS:** Beide Namen zeigen bei Cloudflare derzeit auf Cloudflare-Proxys (orange Wolke) und liefern Fehler 525, weil der Server für sie noch kein Zertifikat hat. Wie bei den anderen Seiten gehören sie auf „nur DNS“ (graue Wolke) mit `A → 78.47.125.152`; das kann ich ohne Cloudflare-Zugang nicht ändern.
 - **Geprüft:** beide Seiten in Playwright WebKit bei 1280 px und 390 px; kein horizontales Scrollen, alle Ressourcen laden, Kopieren-Knöpfe da. Nicht geprüft: nginx-Konfiguration (kein Docker auf diesem Mac) und der eigentliche Deploy (SSH-Zugriff auf den Server wurde von der Rechteprüfung abgelehnt).
+
+## Adobe Lightroom (Cloud-Version) im LR-Tab (Version 0.10.0)
+
+### Was ich geprüft habe (an deinem installierten Lightroom 10.0, App-Store-Version)
+- **Keine Plugin-Schnittstelle** (nur Classic hat das Lua-SDK).
+- **Fensterinhalt nicht zugänglich:** Die Bedienungshilfen sehen im Lightroom-Fenster 0 Elemente, Regler lassen sich also auch nicht „anfassen“.
+- **Internes Steuerungs-API für Hardware-Konsolen** (`LrAppController` u. a. in Lightrooms kompilierten Lua-Dateien): undokumentiert. Darauf aufzubauen hiesse, Adobes internen Code nachzubauen – fragil und vermutlich nicht erlaubt. Bewusst nicht verwendet.
+- **Tastendrücke:** Buchstaben und Pfeile kommen an, **Ziffern (Sterne) nicht**, weder als Tastencode noch als Zeichen. Damit wären Bewertungen unzuverlässig.
+- **Menüleiste zugänglich:** Menüeinträge auswählen funktionierte bei jedem Versuch, auch Sterne. Lightroom trägt jede Aktion ins Rückgängig-Menü ein („Als Bewertung 3 festlegen“).
+- Die echte Kurzbefehlsliste stammt aus Lightroom selbst (`AgKeyboardShortcuts.lua`, Menüattribute). Standard-Satz: Markiert = Z (nicht P wie in Classic), Abgelehnt = X, Unmarkiert = U, Sterne 0–5, Farben 6–9, Bedienfelder ⌘1–⌘7.
+
+### Umsetzung
+- **Mac:** `helper/native/lightroom-menu.applescript` wählt den Eintrag über System Events (dieselbe Berechtigung wie die übrigen Aktionen). Gefunden wird er über **Kurzbefehl + Modifier**, damit es nicht von der Sprache abhängt. Nur Einträge ohne Kurzbefehl (vorheriges/nächstes Foto, Vorher/Nachher, Lila, Keine Farbe) gehen über den Namen (Deutsch und Englisch).
+- **Tempo:** Der erste Entwurf brauchte bis zu 11 s, weil er jedes Menüelement einzeln abfragte. Alle Attribute einer Ebene in einem Abruf und erst die Ebene, dann die Untermenüs: 0,3 s (oberste Ebene) bzw. etwa 1 s (Untermenüs).
+- **Fehlernummern** des Skripts 9001–9003, weil 1002 bei macOS „Bedienungshilfen fehlen“ heisst (ein Test hat die Verwechslung gefunden).
+- **Läuft Lightroom nicht,** startet Copper Deck es und wiederholt den Befehl einmal.
+- **Windows:** Kurzbefehle aus derselben Liste mit Strg statt ⌘, Lightroom wird vorher nach vorne geholt. Ungetestet.
+- **App:** Ist Classic verbunden, gilt Classic (Regler). Sonst und wenn Adobe Lightroom installiert ist (`lightroomCloud` in der ready-Nachricht), zeigt der Tab Schaltflächen: Navigation, Sterne, Markierungen, Farben, Ansicht, Bedienfelder, Werkzeuge, Einstellungen und Export. Ohne Zustand, weil Lightroom nichts zurückmeldet. „Zurücksetzen“ braucht ein zweites Tippen.
+
+### Getestet
+- 5 Unit-Tests (Zuordnung aller 41 Befehle, Argumente, Starten und Wiederholen, Fehlertexte, ohne Lightroom).
+- **An deinem Lightroom, vom iPad (Testbrowser) über den Helper:** Raster, Einzelbild, Nächstes, Vorheriges, 4 Sterne (gesetzt und über die App rückgängig gemacht), Licht-Bedienfeld – alles erfolgreich, mit Screenshots geprüft.
+- **Zwischenfälle beim Testen:**
+  - Zweimal gingen Testschritte daneben: zuerst Tasten, während du selbst am Mac warst, dann einmal 3 Sterne aus einem Zeitmesslauf.
+  - Die Sterne habe ich sofort zurückgenommen, erst nachdem ich den Rückgängig-Eintrag geprüft hatte.
+  - Ein Durchgang über alle 15 Fotos zeigte danach keine Sterne und keine Markierungen.
+  - Vor jedem Tastendruck prüft der Test jetzt, dass Lightroom vorne ist.

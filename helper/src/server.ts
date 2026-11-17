@@ -23,7 +23,8 @@ import type { PermissionMonitor } from './permissions';
 import type { TimerManager } from './timer';
 import { PLATFORM } from './platform';
 import type { LightroomBridge } from './lightroom';
-import type { LrCommand } from '@copper-deck/shared';
+import type { LightroomCloud } from './lightroom-cloud';
+import type { LrCloudCommand, LrCommand } from '@copper-deck/shared';
 
 export interface ServerDeps {
   readonly devices: DeviceStore;
@@ -50,6 +51,10 @@ export interface ServerDeps {
   readonly lightroom?: LightroomBridge;
   /** "Mit vorherigen Einstellungen exportieren" (Tastenkombination in Lightroom). */
   readonly lightroomExport?: () => Promise<RunResult>;
+  /** Adobe Lightroom (Cloud-Version) über Menü bzw. Kurzbefehle. */
+  readonly lightroomCloud?: LightroomCloud;
+  /** Ist Lightroom (Cloud) installiert? (zwischengespeichert, für die ready-Nachricht) */
+  readonly lightroomCloudInstalled?: () => boolean;
 }
 
 interface Session {
@@ -304,7 +309,7 @@ export function createServer(deps: ServerDeps) {
         clearTimeout(authTimer);
         session.deviceId = device.id;
         deps.devices.touch(device.id);
-        send(ws, { type: 'ready', deviceId: device.id, deviceName: device.name, protocol: PROTOCOL_VERSION, helperVersion: deps.version, platform: PLATFORM, tailscaleUrl: deps.tailscaleUrl?.() ?? null });
+        send(ws, { type: 'ready', deviceId: device.id, deviceName: device.name, protocol: PROTOCOL_VERSION, helperVersion: deps.version, platform: PLATFORM, tailscaleUrl: deps.tailscaleUrl?.() ?? null, lightroomCloud: deps.lightroomCloudInstalled?.() ?? false });
         send(ws, { type: 'config', config: deps.config.get() });
         send(ws, { type: 'timer', timer: deps.timers.get(), serverNow: Date.now() });
         send(ws, { type: 'permissions', permissions: deps.permissions.get() });
@@ -327,6 +332,9 @@ export function createServer(deps: ServerDeps) {
           return;
         case 'lr':
           void handleLightroom(ws, parsed.requestId, parsed.command as LrCommand);
+          return;
+        case 'lrc':
+          void handleLightroomCloud(ws, parsed.requestId, parsed.command as LrCloudCommand);
           return;
         case 'auth':
           return; // bereits angemeldet
@@ -366,6 +374,12 @@ export function createServer(deps: ServerDeps) {
       clearTimeout(timer);
       session.inflight -= 1;
     }
+  }
+
+  async function handleLightroomCloud(ws: WebSocket, requestId: string, command: LrCloudCommand): Promise<void> {
+    const r = deps.lightroomCloud ? await deps.lightroomCloud.run(command) : { ok: false as const, message: 'Lightroom-Steuerung ist nicht aktiv.' };
+    log(r.ok ? 'info' : 'warn', 'Lightroom (Cloud)', { cmd: command, ok: r.ok, ...(r.ok ? {} : { message: r.message }) });
+    send(ws, { type: 'lrResult', requestId, ok: r.ok, ...(r.ok ? {} : { message: r.message }) });
   }
 
   async function handleLightroom(ws: WebSocket, requestId: string, command: LrCommand): Promise<void> {

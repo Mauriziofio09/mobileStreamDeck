@@ -1,5 +1,50 @@
 <div class="lr" cdSurface="sheet" [cdRadius]="0.04">
-  @if (!lr.connected()) {
+  @if (lr.cloudMode()) {
+    <!-- Adobe Lightroom (Cloud-Version): Menüeinträge statt Plugin, ohne Regler und ohne Rückmeldung -->
+    <header class="cloud-head">
+      <div>
+        <h2>Adobe Lightroom</h2>
+        <p class="note">Copper Deck wählt die Menüeinträge von Lightroom aus. Regler und Anzeige des Fotos gibt es nur mit Lightroom Classic.</p>
+      </div>
+      <div class="undo">
+        <button type="button" class="icon-btn" aria-label="Rückgängig" (click)="lr.cloud('undo')"><cd-icon name="undo" /></button>
+        <button type="button" class="icon-btn" aria-label="Wiederholen" (click)="lr.cloud('redo')"><cd-icon name="redo" /></button>
+      </div>
+    </header>
+    <section class="panel cloud">
+      <div class="cloud-row">
+        <button type="button" class="big" (click)="lr.cloud('prev')"><cd-icon name="prev" /> Vorheriges</button>
+        <button type="button" class="big" (click)="lr.cloud('next')">Nächstes <cd-icon name="next" /></button>
+      </div>
+      <div class="cloud-row">
+        <div class="rate" role="group" aria-label="Bewertung">
+          @for (n of stars; track n) {
+            <button type="button" class="star on" [attr.aria-label]="n + ' Sterne'" (click)="lr.cloud($any('rating' + n))"><cd-icon name="star" /><span class="n">{{ n }}</span></button>
+          }
+          <button type="button" class="chip" (click)="lr.cloud('rating0')">Keine</button>
+        </div>
+        <div class="flags">
+          <button type="button" class="chip" (click)="lr.cloud('pick')"><cd-icon name="flag" /> Markiert</button>
+          <button type="button" class="chip" (click)="lr.cloud('reject')"><cd-icon name="cross" /> Abgelehnt</button>
+          <button type="button" class="chip" (click)="lr.cloud('unflag')">Unmarkiert</button>
+        </div>
+        <div class="labels" role="group" aria-label="Farbbeschriftung">
+          @for (l of cloudLabels; track l.cmd) {
+            <button type="button" class="dot on" [style.--c]="l.color" [attr.aria-label]="l.name" (click)="lr.cloud(l.cmd)"></button>
+          }
+          <button type="button" class="chip" (click)="lr.cloud('labelNone')">Keine</button>
+        </div>
+      </div>
+      @for (g of cloudGroups; track g.title) {
+        <h3>{{ g.title }}</h3>
+        <div class="cloud-grid">
+          @for (b of g.items; track b.cmd) {
+            <button type="button" class="act" [class.primary]="b.primary" (click)="cloudTap(b)">{{ b.label }}</button>
+          }
+        </div>
+      }
+    </section>
+  } @else if (!lr.connected()) {
     <div class="empty">
       <span class="big"><cd-icon name="aperture" /></span>
       <h2>Lightroom Classic nicht verbunden</h2>

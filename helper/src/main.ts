@@ -21,6 +21,7 @@ import { MediaStore } from './media';
 import { PermissionMonitor } from './permissions';
 import { createServer } from './server';
 import { LightroomBridge } from './lightroom';
+import { LightroomCloud } from './lightroom-cloud';
 import { createSecureContext, type SecureContext } from 'node:tls';
 import { findTailscale, tailscaleStatus, TailscaleCerts } from './tailscale';
 import { TimerManager } from './timer';
@@ -123,8 +124,15 @@ async function serve(): Promise<void> {
     const r = await runner.run({ type: 'hotkey', modifiers: [IS_WINDOWS ? 'control' : 'command', 'option', 'shift'], key: 'e' });
     return r.ok ? { ok: true as const, message: 'Export mit vorherigen Einstellungen gestartet.' } : r;
   };
+  // Adobe Lightroom (Cloud-Version): über Menüeinträge (Mac) bzw. Kurzbefehle (Windows)
+  const lightroomCloud = new LightroomCloud({ exec: execFileSafe, catalog, runner, permissions, menuScript: resolveScript('lightroom-menu') });
+  let lightroomCloudInstalled = false;
+  const checkLrCloud = async () => { lightroomCloudInstalled = !!(await lightroomCloud.app()); };
+  void checkLrCloud();
+  setInterval(() => void checkLrCloud().catch(() => undefined), 5 * 60_000).unref();
   const srv = createServer({
     devices, pairing, config, catalog, runner, timers, permissions, lightroom, lightroomExport,
+    lightroomCloud, lightroomCloudInstalled: () => lightroomCloudInstalled,
     media,
     origins, webRoot, tls: await readTls(), version: VERSION,
     tailscaleUrl: () => (tsName ? tsOrigin(tsName) : null),

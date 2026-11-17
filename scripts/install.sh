@@ -57,7 +57,7 @@ chmod 700 "$DATA" "$LOGS"
 rm -rf "$RUNTIME.new"
 mkdir -p "$RUNTIME.new/helper" "$RUNTIME.new/bin"
 cp "$REPO/helper/dist/copper-deck.mjs" "$REPO/helper/dist/copper-deck.mjs.map" "$RUNTIME.new/helper/"
-cp "$REPO/helper/native/keystroke.applescript" "$REPO/helper/native/activate.applescript" "$RUNTIME.new/helper/"
+cp "$REPO/helper/native/keystroke.applescript" "$REPO/helper/native/activate.applescript" "$REPO/helper/native/lightroom-menu.applescript" "$RUNTIME.new/helper/"
 cp -R "$REPO/web/dist/web/browser" "$RUNTIME.new/web"
 /usr/bin/python3 -c 'import json,sys; print(json.dumps({"node": sys.argv[1], "script": sys.argv[2]}))' \
   "$NODE" "$RUNTIME/helper/copper-deck.mjs" > "$RUNTIME.new/launch.json"

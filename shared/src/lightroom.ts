@@ -135,3 +135,22 @@ export const LR_EMPTY_STATE: LrState = {
 
 /** Lokale Ports des Plugins (nur 127.0.0.1). Das Plugin empfängt auf dem ersten und sendet auf dem zweiten. */
 export const LR_PORTS = { toPlugin: 47801, fromPlugin: 47802 } as const;
+
+/**
+ * Adobe Lightroom (Cloud-Version, nicht Classic): keine Plugin-Schnittstelle. Copper Deck wählt am Mac die
+ * Menüeinträge von Lightroom aus (zuverlässiger als Tasten), unter Windows sendet es die Kurzbefehle.
+ * Feste Liste; keine Reglerwerte und kein Zustand (Lightroom meldet nichts zurück).
+ */
+export const LR_CLOUD_COMMANDS = [
+  'prev', 'next',
+  'rating0', 'rating1', 'rating2', 'rating3', 'rating4', 'rating5',
+  'pick', 'reject', 'unflag',
+  'labelRed', 'labelYellow', 'labelGreen', 'labelBlue', 'labelPurple', 'labelNone',
+  'auto', 'copy', 'paste', 'undo', 'redo', 'resetEdits',
+  'crop', 'heal', 'mask',
+  'edit', 'presets', 'profiles',
+  'panelLight', 'panelColor', 'panelEffects', 'panelDetail', 'panelOptics', 'panelGeometry',
+  'grid', 'detail', 'original', 'beforeAfter',
+  'exportDialog', 'exportPrevious',
+] as const;
+export type LrCloudCommand = (typeof LR_CLOUD_COMMANDS)[number];

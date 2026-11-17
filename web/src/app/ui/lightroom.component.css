@@ -136,3 +136,24 @@ code { font-family: ui-monospace, Menlo, monospace; color: var(--c-text-lilac); 
 :host-context(.is-phone.is-landscape) .labels,
 :host-context(.is-phone.is-landscape) .module { display: none; }
 :host-context(.is-phone.is-landscape) .top { flex-wrap: nowrap; }
+
+/* ---------- Adobe Lightroom (Cloud) ---------- */
+.cloud-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--c-frame-rim); }
+.cloud-head h2 { font: 700 26px/1 var(--font-label); text-transform: uppercase; margin: 2px 0 4px; }
+.cloud-head .note { margin: 0; max-width: 560px; }
+.cloud { padding-top: 12px; }
+.cloud h3 { margin: 16px 0 8px; font: 700 14px var(--font-label); text-transform: uppercase; letter-spacing: 0.06em; color: var(--c-text-lilac); }
+.cloud-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; margin-bottom: 12px; }
+.big {
+  flex: 1 1 200px; height: 58px; border: 0; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--c-group-fill-top); box-shadow: inset 0 0 0 1px var(--c-frame-rim);
+  font: 700 20px var(--font-label); text-transform: uppercase; letter-spacing: 0.03em;
+}
+.big:active, .act:active, .cloud .star:active { transform: scale(0.95); }
+.cloud .star { position: relative; color: #f2c94c; width: 44px; height: 44px; font-size: 26px; }
+.cloud .star .n { position: absolute; left: 0; right: 0; top: 13px; font: 700 12px var(--font-ui); color: #2a1608; }
+.cloud .dot { width: 28px; height: 28px; opacity: 1; }
+.cloud-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.cloud-grid .act { width: 100%; height: 48px; }
+:host-context(.is-phone) .cloud-grid { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
+:host-context(.is-phone) .big { height: 48px; font-size: 17px; }

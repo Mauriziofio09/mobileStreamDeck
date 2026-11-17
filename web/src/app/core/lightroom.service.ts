@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { LR_PARAMS, type LrCommand, type LrParamDef } from '@copper-deck/shared';
+import { LR_PARAMS, type LrCloudCommand, type LrCommand, type LrParamDef } from '@copper-deck/shared';
 import { ConnectionService } from './connection.service';
 import { DeckStore } from './deck.store';
 
@@ -22,6 +22,8 @@ export class LightroomService {
   readonly presets = this.conn.lrPresets;
   readonly connected = computed(() => this.conn.online() && this.state().connected);
   readonly inDevelop = computed(() => this.state().module === 'develop');
+  /** Adobe Lightroom (Cloud-Version) statt Classic: Steuerung über Menüeinträge, ohne Regler. */
+  readonly cloudMode = computed(() => this.conn.online() && !this.state().connected && this.conn.lightroomCloud());
 
   /** Lokale Werte während und kurz nach dem Ziehen. */
   private readonly local = signal<ReadonlyMap<string, number>>(new Map());
@@ -69,6 +71,14 @@ export class LightroomService {
 
   async run(command: LrCommand, success?: string): Promise<boolean> {
     const r = await this.conn.lr(command);
+    if (!r.ok) this.store.toast(r.message ?? 'Lightroom hat den Befehl nicht ausgeführt.', 'error');
+    else if (success) this.store.toast(success, 'info');
+    return r.ok;
+  }
+
+  /** Befehl an Lightroom (Cloud); Fehler als Hinweis. */
+  async cloud(command: LrCloudCommand, success?: string): Promise<boolean> {
+    const r = await this.conn.lrc(command);
     if (!r.ok) this.store.toast(r.message ?? 'Lightroom hat den Befehl nicht ausgeführt.', 'error');
     else if (success) this.store.toast(success, 'info');
     return r.ok;

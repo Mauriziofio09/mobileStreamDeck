@@ -1,5 +1,5 @@
 import type { DeckConfig, HostPlatform, InstalledApp } from './config';
-import type { LrCommand, LrPresetFolder, LrState } from './lightroom';
+import type { LrCloudCommand, LrCommand, LrPresetFolder, LrState } from './lightroom';
 
 /**
  * WebSocket-Protokoll zwischen PWA und Helper.
@@ -20,7 +20,9 @@ export type ClientMessage =
   /** Konfigurationsänderung; basiert auf baseRevision (sonst Ablehnung als veraltet). */
   | { readonly type: 'saveConfig'; readonly requestId: string; readonly baseRevision: number; readonly config: DeckConfig }
   /** Lightroom Classic steuern (nur feste Befehle und Regler aus LR_PARAMS). */
-  | { readonly type: 'lr'; readonly requestId: string; readonly command: LrCommand };
+  | { readonly type: 'lr'; readonly requestId: string; readonly command: LrCommand }
+  /** Adobe Lightroom (Cloud-Version) über Menüeinträge bzw. Kurzbefehle. */
+  | { readonly type: 'lrc'; readonly requestId: string; readonly command: LrCloudCommand };
 
 export type SaveRejectReason = 'stale' | 'invalid';
 
@@ -80,7 +82,7 @@ export const SYSTEM_ACTIONS = [
 export type SystemActionId = (typeof SYSTEM_ACTIONS)[number];
 
 export type ServerMessage =
-  | { readonly type: 'ready'; readonly deviceId: string; readonly deviceName: string; readonly protocol: number; readonly helperVersion: string; readonly platform: HostPlatform; readonly tailscaleUrl?: string | null }
+  | { readonly type: 'ready'; readonly deviceId: string; readonly deviceName: string; readonly protocol: number; readonly helperVersion: string; readonly platform: HostPlatform; readonly tailscaleUrl?: string | null; readonly lightroomCloud?: boolean }
   | { readonly type: 'config'; readonly config: DeckConfig }
   /** Installierte Apps, die in der Konfiguration vorkommen (für "nicht verfügbar"). */
   | { readonly type: 'apps'; readonly apps: readonly InstalledApp[] }

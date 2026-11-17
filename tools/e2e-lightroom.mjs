@@ -37,12 +37,14 @@ try {
   // 1) Ohne Lightroom: Hinweis
   await P.click('cd-side-controls button[aria-label="Lightroom"]');
   await P.waitForSelector('cd-lightroom');
-  check(await P.locator('cd-lightroom h2', { hasText: 'nicht verbunden' }).count() === 1, 'Ohne Lightroom: Ansicht erklärt, was zu tun ist');
+  // Ohne Classic: Hinweis – oder, wenn Adobe Lightroom (Cloud) installiert ist, dessen Schaltflächen
+  check(await P.locator('cd-lightroom h2', { hasText: 'nicht verbunden' }).count() === 1 || await P.locator('cd-lightroom .cloud').count() === 1,
+    'Ohne Classic: Hinweis bzw. Schaltflächen für Adobe Lightroom');
   await P.screenshot({ path: 'screenshots/lr-ipad-disconnected.png' });
 
   // 2) "Lightroom" startet: Helper verbindet sich von selbst
   fake = await startFakeLightroom();
-  check(await until(async () => (await P.locator('cd-lightroom .photo .name').count()) === 1, 6000), 'Helper verbindet sich von selbst mit dem Plugin');
+  check(await until(async () => (await P.locator('cd-lightroom .photo .name').count()) === 1, 6000), 'Helper verbindet sich von selbst mit dem Plugin (Classic hat Vorrang)');
   check((await P.locator('cd-lightroom .photo .name').textContent()) === 'DSC_0042.NEF', 'Aktuelles Foto wird angezeigt');
   check(await P.locator('cd-side-controls .lr-dot').count() === 1, 'Grüner Punkt am LR-Segment');
 
@@ -124,7 +126,8 @@ try {
   // 11) Lightroom wird beendet
   await fake.close();
   fake = null;
-  check(await until(async () => (await P.locator('cd-lightroom h2', { hasText: 'nicht verbunden' }).count()) === 1, 6000), 'Lightroom beendet: App zeigt das sofort');
+  check(await until(async () => (await P.locator('cd-lightroom h2', { hasText: 'nicht verbunden' }).count()) === 1 || (await P.locator('cd-lightroom .cloud').count()) === 1, 6000),
+    'Classic beendet: App zeigt das sofort');
 } catch (e) {
   check(false, `Abbruch: ${e.message.split('\n')[0]}`);
 } finally {
