@@ -466,14 +466,14 @@ Im selben WLAN verbindet sich das iPhone direkt mit dem Mac/PC. In Netzen, die G
 ### Einrichtung
 1. **Tailscale** auf Mac/PC und iPhone/iPad installieren (https://tailscale.com/download, iOS: App Store) und mit **demselben Konto** anmelden.
 2. Im Tailscale-Admin (login.tailscale.com → **DNS**) **MagicDNS** und **HTTPS Certificates** aktivieren.
-3. Helper neu starten oder bis zu 10 Minuten warten. `copper-deck tailscale` zeigt die Adresse, z. B. `https://copperdeck-mac.<tailnet>.ts.net:7443`.
+3. Bis zu einer Minute warten (oder den Helper neu starten). `copper-deck tailscale` zeigt die Adresse, z. B. `https://copperdeck-mac.<tailnet>.ts.net:7443`.
 4. Auf dem iPhone in **Safari** diese Adresse öffnen → Teilen → **Zum Home-Bildschirm** → mit `copper-deck pair` koppeln. Diese App funktioniert dann zuhause, im Firmen-WLAN und über Mobilfunk, solange Tailscale auf dem iPhone aktiv ist.
 
 > iOS behandelt jede Adresse als eigene App mit eigener Kopplung. Die `.local`-App kann bleiben (nur im selben WLAN); die Tailscale-App ist die, die überall geht.
 
 ### Zertifikat
 - Der Helper holt für die Tailscale-Adresse ein **echtes Zertifikat** (Let's Encrypt über `tailscale cert`) und erneuert es von selbst. Dann braucht das iPhone **kein mkcert-Profil**.
-- **Bis es da ist**, gilt das mkcert-Zertifikat (es enthält den Tailscale-Namen ebenfalls). Netze, die verschlüsselte Verbindungen mitlesen (z. B. Swisscom SecurePOP im Firmen-WLAN), verhindern das Holen; der Helper versucht es alle 10 Minuten erneut und klappt in einem anderen Netz (Hotspot, zuhause).
+- **Bis es da ist**, gilt das mkcert-Zertifikat (es enthält den Tailscale-Namen ebenfalls). Netze, die verschlüsselte Verbindungen mitlesen (z. B. Swisscom SecurePOP im Firmen-WLAN), verhindern das Holen; der Helper versucht es jede Minute erneut (holt aber nur, wenn nötig) und klappt in einem anderen Netz (Hotspot, zuhause).
 - **Name:** Zertifikate von Let's Encrypt sind öffentlich einsehbar (Certificate-Transparency-Logs). Der Mac heisst in Tailscale deshalb neutral `copperdeck-mac` statt mit deinem Namen. Ändern: `tailscale set --hostname=<name>`.
 - Der Helper nimmt Verbindungen weiterhin nur von gekoppelten Geräten an; erreichbar ist er über Tailscale nur für Geräte in deinem eigenen Tailnet.
 

@@ -89,6 +89,8 @@ export function splitPem(pem: string): { key: string; cert: string } | null {
 export class TailscaleCerts {
   private current: TailscaleCert | null = null;
   lastError: string | null = null;
+  /** Nach einem Fehlschlag frühestens nach 10 Minuten erneut (Let's Encrypt begrenzt Fehlversuche). */
+  private retryAfter = 0;
 
   constructor(private readonly exec: Exec, private readonly dir: string) {}
 
@@ -123,6 +125,7 @@ export class TailscaleCerts {
     if (!TS_NAME.test(name)) return false;
     const have = this.current?.name === name ? this.current : await this.load(name);
     if (have && have.validTo.getTime() - Date.now() > RENEW_BEFORE_MS) return false;
+    if (Date.now() < this.retryAfter) return false;
     try {
       const { stdout } = await this.exec(bin, ['cert', '--cert-file', '-', '--key-file', '-', name], { timeoutMs: 90_000, env: CLI_ENV });
       const parts = splitPem(stdout);
@@ -139,6 +142,7 @@ export class TailscaleCerts {
     } catch (e) {
       const err = e as Error & { stderr?: string };
       this.lastError = explain(err.stderr || err.message);
+      this.retryAfter = Date.now() + 10 * 60_000;
       log('warn', 'Tailscale-Zertifikat nicht erhalten', { name, error: this.lastError });
       return false;
     }

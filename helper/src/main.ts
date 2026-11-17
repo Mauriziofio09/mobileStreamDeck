@@ -179,7 +179,7 @@ async function serve(): Promise<void> {
   });
   log('info', `Copper Deck ${VERSION} läuft: ${origins[0]}`, { platform: PLATFORM, ips: host.lanIps, tailscale: tsName, webRoot, context, native: native.binary });
 
-  // Tailscale: alle 10 Minuten Name und Zertifikat prüfen. Ein neues Zertifikat holt der Helper erst,
+  // Tailscale: jede Minute Name und Zertifikat prüfen. Ein neues Zertifikat holt der Helper erst,
   // wenn das alte weniger als 30 Tage gilt; schlägt es fehl (z. B. Firmen-WLAN), gilt das mkcert-Zertifikat weiter.
   const refreshTailscale = async () => {
     const st = await tailscaleStatus(execFileSafe, tsBin);
@@ -201,7 +201,9 @@ async function serve(): Promise<void> {
   };
   if (tsBin) {
     void refreshTailscale().catch((e: Error) => log('warn', 'Tailscale-Prüfung fehlgeschlagen', { error: e.message }));
-    setInterval(() => void refreshTailscale().catch(() => undefined), 10 * 60_000).unref();
+    // Jede Minute: Wird Tailscale erst nach dem Helper eingeschaltet, ist die Adresse spätestens dann da.
+    // (tailscale status ist billig; ein neues Zertifikat holt ensure() nur, wenn es nötig ist.)
+    setInterval(() => void refreshTailscale().catch(() => undefined), 60_000).unref();
   }
 
   // Berechtigungen: Systemdialoge nur beim ersten Start im App-Kontext zeigen, danach still prüfen.
@@ -283,7 +285,7 @@ async function cli(cmd: string, args: string[]): Promise<void> {
       process.stdout.write(`Adresse: ${r.url}\n`);
       if (r.certificate) process.stdout.write(`Zertifikat: Let's Encrypt, gültig bis ${r.certificate.validTo.slice(0, 10)} – kein mkcert-Profil nötig.\n`);
       else if (!r.certAllowed) process.stdout.write('Zertifikat: HTTPS im Tailscale-Netz aktivieren (login.tailscale.com → DNS → HTTPS Certificates). Bis dahin gilt das mkcert-Zertifikat.\n');
-      else process.stdout.write(`Zertifikat: noch keins${r.certificateError ? ` (${r.certificateError})` : ''}. Bis dahin gilt das mkcert-Zertifikat; neuer Versuch alle 10 Minuten.\n`);
+      else process.stdout.write(`Zertifikat: noch keins${r.certificateError ? ` (${r.certificateError})` : ''}. Bis dahin gilt das mkcert-Zertifikat; neuer Versuch jede Minute.\n`);
       return;
     }
     case 'status': {

@@ -70,6 +70,11 @@ describe('Tailscale-Zertifikat', () => {
     assert.equal(await certs.ensure('/ts', NAME), false);
     assert.equal(certs.get(), null);
     assert.match(certs.lastError ?? '', /Firmen-WLAN/);
+    // Kein erneuter Versuch in den nächsten 10 Minuten
+    let again = false;
+    (certs as unknown as { exec: Exec }).exec = async () => { again = true; return { stdout: TS_CERT + TS_KEY, stderr: '' }; };
+    assert.equal(await certs.ensure('/ts', NAME), false);
+    assert.equal(again, false);
   });
 
   test('ungültige Namen werden gar nicht erst angefragt', async () => {
